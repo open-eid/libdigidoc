@@ -1,0 +1,43 @@
+#ifndef Q_CC_BOR
+# if defined(UNDER_CE) && UNDER_CE >= 400
+#  include <winbase.h>
+# else
+#  include <winver.h>
+# endif
+#endif
+
+#include <config.h>
+
+VS_VERSION_INFO VERSIONINFO
+  FILEVERSION VERSION_COMMA
+  PRODUCTVERSION VERSION_COMMA
+  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+  FILEFLAGS VS_FF_DEBUG
+#else
+  FILEFLAGS 0x0L
+#endif
+  FILEOS VOS_NT_WINDOWS32
+  FILETYPE VFT_DLL
+  FILESUBTYPE VFT_UNKNOWN
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904E4"
+		BEGIN
+			VALUE "CompanyName", "Estonian ID Card\0"
+			VALUE "FileDescription", "libdigidoc\0"
+			VALUE "FileVersion", VERSION "\0"
+            VALUE "InternalName", "libdigidoc\0"
+			VALUE "LegalCopyright", "Copyright (C) 2009-2012 Estonian ID Card"
+            VALUE "OriginalFilename", "libdigidoc.dll\0"
+			VALUE "ProductName", "libdigidoc\0"
+			VALUE "ProductVersion", VERSION "\0"
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x425, 1200
+	END
+END
+/* End of Version info */

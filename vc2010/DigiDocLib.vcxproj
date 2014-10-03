@@ -1,0 +1,206 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="libdigidoc\DigiCrypt.c" />
+    <ClCompile Include="libdigidoc\DigiDocCert.c" />
+    <ClCompile Include="libdigidoc\DigiDocConfig.c" />
+    <ClCompile Include="libdigidoc\DigiDocConvert.c" />
+    <ClCompile Include="libdigidoc\DigiDocCsp.c" />
+    <ClCompile Include="libdigidoc\DigiDocDebug.c" />
+    <ClCompile Include="libdigidoc\DigiDocDfExtract.c" />
+    <ClCompile Include="libdigidoc\DigiDocEnc.c" />
+    <ClCompile Include="libdigidoc\DigiDocEncGen.c" />
+    <ClCompile Include="libdigidoc\DigiDocEncSAXParser.c" />
+    <ClCompile Include="libdigidoc\DigiDocError.c" />
+    <ClCompile Include="libdigidoc\DigiDocGen.c" />
+    <ClCompile Include="libdigidoc\DigiDocGlobals.c" />
+    <ClCompile Include="libdigidoc\DigiDocHTTP.c" />
+    <ClCompile Include="libdigidoc\DigiDocLib.c" />
+    <ClCompile Include="libdigidoc\DigiDocMem.c" />
+    <ClCompile Include="libdigidoc\DigiDocObj.c" />
+    <ClCompile Include="libdigidoc\DigiDocOCSP.c" />
+    <ClCompile Include="libdigidoc\DigiDocParser.c" />
+    <ClCompile Include="libdigidoc\DigiDocPKCS11.c" />
+    <ClCompile Include="libdigidoc\DigiDocSAXParser.c" />
+    <ClCompile Include="libdigidoc\DigiDocService.c" />
+    <ClCompile Include="libdigidoc\DigiDocStack.c" />
+    <ClCompile Include="libdigidoc\DigiDocVerify.c" />
+    <ClCompile Include="libdigidoc\DlgUnit.c" />
+    <ClCompile Include="libdigidoc\DlgUnitS.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="libdigidoc\DigiCrypt.h" />
+    <ClInclude Include="libdigidoc\DigiDocCert.h" />
+    <ClInclude Include="libdigidoc\DigiDocConfig.h" />
+    <ClInclude Include="libdigidoc\DigiDocConvert.h" />
+    <ClInclude Include="libdigidoc\DigiDocCsp.h" />
+    <ClInclude Include="libdigidoc\DigiDocDebug.h" />
+    <ClInclude Include="libdigidoc\DigiDocDefs.h" />
+    <ClInclude Include="libdigidoc\DigiDocDfExtract.h" />
+    <ClInclude Include="libdigidoc\DigiDocEnc.h" />
+    <ClInclude Include="libdigidoc\DigiDocEncGen.h" />
+    <ClInclude Include="libdigidoc\DigiDocEncSAXParser.h" />
+    <ClInclude Include="libdigidoc\DigiDocError.h" />
+    <ClInclude Include="libdigidoc\DigiDocGen.h" />
+    <ClInclude Include="libdigidoc\DigiDocGlobals.h" />
+    <ClInclude Include="libdigidoc\DigiDocHTTP.h" />
+    <ClInclude Include="libdigidoc\DigiDocLib.h" />
+    <ClInclude Include="libdigidoc\DigiDocMem.h" />
+    <ClInclude Include="libdigidoc\DigiDocObj.h" />
+    <ClInclude Include="libdigidoc\DigiDocOCSP.h" />
+    <ClInclude Include="libdigidoc\DigiDocParser.h" />
+    <ClInclude Include="libdigidoc\DigiDocPKCS11.h" />
+    <ClInclude Include="libdigidoc\DigiDocSAXParser.h" />
+    <ClInclude Include="libdigidoc\DigiDocService.h" />
+    <ClInclude Include="libdigidoc\DigiDocStack.h" />
+    <ClInclude Include="libdigidoc\DigiDocVerify.h" />
+    <ClInclude Include="libdigidoc\DlgUnit.h" />
+    <ClInclude Include="libdigidoc\resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="libdigidoc\DlgUnit.rc" />
+    <ResourceCompile Include="libdigidoc\libdigidoc.rc" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <SccProjectName />
+    <SccLocalPath />
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.Cpp.UpgradeFromVC60.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.Cpp.UpgradeFromVC60.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>.\Debug\</OutDir>
+    <IntDir>.\Debug\</IntDir>
+    <LinkIncremental>true</LinkIncremental>
+    <TargetName>digidoc</TargetName>
+    <IncludePath>C:\install;C:\install\zlib\include;C:\install\openssl_shared\include;Z:\projects\libdigidoc\trunk;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\install\libxml2;C:\install\openssl_shared\lib;C:\install\zlib\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>.\Release\</OutDir>
+    <IntDir>.\Release\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>Z:\projects\libdigidoc\trunk;C:\install;C:\install\openssl_shared\include;C:\install\zlib\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\install\libxml2;C:\install\openssl_shared\lib;C:\install\zlib\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <Optimization>Disabled</Optimization>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <WarningLevel>Level3</WarningLevel>
+      <MinimalRebuild>true</MinimalRebuild>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;BUILDINGDLL;WITH_SOAPDEFS_H;digidoc_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AssemblerListingLocation>.\Debug\</AssemblerListingLocation>
+      <PrecompiledHeaderOutputFile>.\Debug\DigiDocLib.pch</PrecompiledHeaderOutputFile>
+      <ObjectFileName>.\Debug\</ObjectFileName>
+      <ProgramDataBaseFileName>.\Debug\</ProgramDataBaseFileName>
+    </ClCompile>
+    <Midl>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TypeLibraryName>.\Debug\DigiDocLib.tlb</TypeLibraryName>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <RedirectOutputAndErrors>NUL</RedirectOutputAndErrors>
+      <TargetEnvironment>Win32</TargetEnvironment>
+    </Midl>
+    <ResourceCompile>
+      <Culture>0x041d</Culture>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+    <Bscmake>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <OutputFile>.\Debug\DigiDocLib.bsc</OutputFile>
+    </Bscmake>
+    <Link>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <LinkDLL>true</LinkDLL>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OutputFile>bin/digidoc.dll</OutputFile>
+      <ImportLibrary>bin\digidoc.lib</ImportLibrary>
+      <AdditionalDependencies>comctl32.lib;odbc32.lib;odbccp32.lib;libxml2.lib;crypt32.lib;Shlwapi.lib;libeay32.lib;ssleay32.lib;zlib.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>LIBCMTD.LIB</IgnoreSpecificDefaultLibraries>
+      <ShowProgress>NotSet</ShowProgress>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <StringPooling>true</StringPooling>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <Optimization>MaxSpeed</Optimization>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <WarningLevel>Level3</WarningLevel>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;BUILDINGDLL;WITH_SOAPDEFS_H;digidoc_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AssemblerListingLocation>.\Release\</AssemblerListingLocation>
+      <PrecompiledHeaderOutputFile>.\Release\DigiDocLib.pch</PrecompiledHeaderOutputFile>
+      <ObjectFileName>.\Release\</ObjectFileName>
+      <ProgramDataBaseFileName>.\Release\</ProgramDataBaseFileName>
+    </ClCompile>
+    <Midl>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TypeLibraryName>.\Release\DigiDocLib.tlb</TypeLibraryName>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <RedirectOutputAndErrors>NUL</RedirectOutputAndErrors>
+      <TargetEnvironment>Win32</TargetEnvironment>
+    </Midl>
+    <ResourceCompile>
+      <Culture>0x041d</Culture>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+    <Bscmake>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <OutputFile>.\Release\DigiDocLib.bsc</OutputFile>
+    </Bscmake>
+    <Link>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <LinkDLL>true</LinkDLL>
+      <SubSystem>Windows</SubSystem>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <OutputFile>bin\DigiDocLib.dll</OutputFile>
+      <ImportLibrary>.\Release\DigiDocLib.lib</ImportLibrary>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>comctl32.lib;odbc32.lib;odbccp32.lib;libxml2.lib;crypt32.lib;Shlwapi.lib;libeay32.lib;ssleay32.lib;zlib.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>LIBCMT.lib</IgnoreSpecificDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

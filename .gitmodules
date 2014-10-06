@@ -1,0 +1,6 @@
+[submodule "etc/certs"]
+	path = etc/certs
+	url = ../certs
+[submodule "cmake"]
+	path = cmake
+	url = ../cmake

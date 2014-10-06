@@ -106,6 +106,10 @@ install( TARGETS digidoc
 	FRAMEWORK DESTINATION /Library/Frameworks
 )
 
+if(WIN32)
+	install( DIRECTORY ${PROJECT_BINARY_DIR}/libdigidoc/ DESTINATION ${CMAKE_INSTALL_LIBDIR} FILES_MATCHING PATTERN "*.pdb" )
+endif()
+
 if( FRAMEWORK )
 	set_target_properties( digidoc PROPERTIES
 		OUTPUT_NAME "libdigidoc"

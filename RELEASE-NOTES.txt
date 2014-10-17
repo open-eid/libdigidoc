@@ -4,7 +4,7 @@ DigiDoc C library 3.9.1 release notes
 Changes compared to ver 3.9
 
 - DDOC security fixes:
-	- Improved validation DDOC files' XML structure. This is a highly relevant security fix having an effect on the validation of DDOC files. The unfixed library can mistakenly give positive results on validation of invalid DDOC files with incorrect XML elements' ordering.
+	- Improved XML structure validation for DDOC files. This is a highly relevant security fix having an effect on the validation of DDOC files. The unfixed library can mistakenly give positive results on validation of invalid DDOC files with incorrect XML elements' ordering.
 
 
 

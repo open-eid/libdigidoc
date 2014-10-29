@@ -124,6 +124,7 @@ else()
 	configure_file( cdigidoc.1.cmake cdigidoc.1 )
 	install( FILES ${CMAKE_CURRENT_BINARY_DIR}/libdigidoc.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig )
 	install( FILES ${CMAKE_CURRENT_BINARY_DIR}/cdigidoc.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+	install( FILES ${CERTS} DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/libdigidoc )
 endif()
 
 #install( FILES

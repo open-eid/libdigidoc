@@ -14,13 +14,8 @@ include( GNUInstallDirs )
 
 if( WIN32 )
 	set( DIGIDOC_CONF_NAME "digidoc.ini" )
-	set( DIGIDOC_DATA_DIR "esteid")
 else()
 	set( DIGIDOC_CONF_NAME "digidoc.conf" )
-	set( DIGIDOC_DATA_DIR "${CMAKE_INSTALL_FULL_DATADIR}/esteid")
-endif()
-if( NOT DIGIDOC_CERT_LOCATION )
-	set( DIGIDOC_CERT_LOCATION ${DIGIDOC_DATA_DIR} )
 endif()
 
 find_package( Doxygen )

@@ -4,7 +4,7 @@
 #--------------------------------------------------
 
 [ca]
-CA_CERT_PATH=@DIGIDOC_CERT_LOCATION@/certs
+CA_CERT_PATH=@CMAKE_INSTALL_FULL_DATADIR@/libdigidoc
 CA_CERTS=23
 
 CA_CERT_1=JUUR-SK.crt

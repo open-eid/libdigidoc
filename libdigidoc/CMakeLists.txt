@@ -117,7 +117,24 @@ if( FRAMEWORK )
 		LINK_FLAGS "-framework CoreFoundation -framework Security"
 		RESOURCE "${CERTS};${CMAKE_CURRENT_BINARY_DIR}/${DIGIDOC_CONF_NAME}"
 	)
-	install( TARGETS cdigidoc DESTINATION /Library/Frameworks/libdigidoc.framework/Resources )
+	add_custom_command( TARGET cdigidoc POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cdigidoc> $<TARGET_FILE_DIR:digidoc>/Resources )
+	add_custom_target( codesign DEPENDS cdigidoc
+		COMMAND codesign -f -s \"$$SIGNCERT\" $<TARGET_FILE_DIR:digidoc>/Resources/cdigidoc
+		COMMAND codesign -f -s \"$$SIGNCERT\" $<TARGET_FILE_DIR:digidoc>/../..
+		COMMAND touch $<TARGET_FILE:cdigidoc>
+	)
+	add_custom_target( pkgbuild DEPENDS codesign
+		COMMAND make install DESTDIR=install \; pkgbuild
+			--root install
+			--sign \"$$INSTCERT\"
+			${CMAKE_BINARY_DIR}/libdigidoc_${VERSION}$ENV{VER_SUFFIX}.pkg
+	)
+	add_custom_target( zipdebug DEPENDS cdigidoc
+		COMMAND dsymutil -o libdigidoc.dSYM $<TARGET_FILE:digidoc>
+		COMMAND dsymutil -o libdigidoc.dSYM $<TARGET_FILE:cdigidoc>
+		COMMAND zip -r ${CMAKE_BINARY_DIR}/libdigidoc-dbg_${VERSION}$ENV{VER_SUFFIX}.zip libdigidoc.dSYM
+	)
 else()
 	install( TARGETS cdigidoc DESTINATION ${CMAKE_INSTALL_BINDIR} )
 	configure_file( libdigidoc.pc.cmake libdigidoc.pc @ONLY )

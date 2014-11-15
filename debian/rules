@@ -1,0 +1,13 @@
+#!/usr/bin/make -f
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/cmake.mk
+DEB_CMAKE_EXTRA_FLAGS = \
+	-DCMAKE_INSTALL_SYSCONFDIR="/etc" \
+	-DCMAKE_INSTALL_LIBDIR="lib/$(DEB_HOST_MULTIARCH)" \
+	-DINSTALL_DOC=YES
+
+DEB_DH_INSTALL_ARGS=--exclude=TEST
+
+binary-install/libdigidoc-dev::
+# Run dh_install without the default DEB_DH_INSTALL_ARGS to install the TEST*.crt certificates
+	dh_install -plibdigidoc-dev

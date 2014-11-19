@@ -78,6 +78,25 @@ EXP_OPTION int ReadCertificate(X509 **x509, const char *szCertfile)
 }
 
 //--------------------------------------------------
+// Reads a certificate file
+// certfile - name of the certificate file
+//--------------------------------------------------
+EXP_OPTION int ReadCertificateNoErr(X509 **x509, const char *szCertfile)
+{
+    BIO *in;
+    
+    RETURN_IF_NULL_PARAM(szCertfile);
+    if((in = BIO_new_file(szCertfile, "rb")) != NULL) {
+        *x509 = PEM_read_bio_X509(in, NULL, NULL, 0);
+        BIO_free(in);
+        if(!*x509) return ERR_NULL_CERT_POINTER;
+    } else
+        return ERR_FILE_READ;
+    return ERR_OK;
+}
+
+
+//--------------------------------------------------
 // Reads a certificate from pkcs12 conteiner
 //--------------------------------------------------
 EXP_OPTION int ReadCertificateByPKCS12(X509 **x509, const char *pkcs12file, const char *passwd, EVP_PKEY **pkey)

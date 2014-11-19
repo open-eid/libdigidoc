@@ -58,6 +58,7 @@ EXP_OPTION int ddocWriteKeyAndCertPem(EVP_PKEY *privKey, X509* pCert,
 
 
 EXP_OPTION int  ReadCertificate(X509 **x509, const char *certfile);
+EXP_OPTION int ReadCertificateNoErr(X509 **x509, const char *szCertfile);
 EXP_OPTION int  ReadCertSerialNumber(char* szSerial, int nMaxLen, X509 *x509);
 EXP_OPTION int ReadCertificateByPKCS12(X509 **x509, const char *pkcs12file, const char *passwd, EVP_PKEY **pkey);
 

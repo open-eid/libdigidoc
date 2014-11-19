@@ -984,7 +984,7 @@ int initCertificateItems()
             snprintf(buf2, sizeof(buf2), "%s/%s", p2, p3);
 #endif
             x509 = 0;
-            e2 = ReadCertificate(&x509, buf2);
+            ReadCertificateNoErr(&x509, buf2);
             if(x509) {
                 ddocDebug(3, "initCertificateItems", "CA Cert item: %d CN: %s file: %s", i, p1, p3);
                 addCertificateItem(&g_configStore, p1, x509); // release ownership on x509!
@@ -1010,7 +1010,7 @@ int initCertificateItems()
             snprintf(buf2, sizeof(buf2), "%s/%s", p2, p3);
 #endif
             x509 = 0;
-            e2 = ReadCertificate(&x509, buf2);
+            ReadCertificateNoErr(&x509, buf2);
             if(x509) {
                 ddocDebug(3, "initCertificateItems", "OCSP Cert item: %d CN: %s file: %s", i, p1, buf1);
                 addCertificateItem(&g_configStore, buf1, x509); // release ownership on x509!
@@ -1028,7 +1028,7 @@ int initCertificateItems()
                 snprintf(buf2, sizeof(buf2), "%s/%s", p2, p3);
 #endif
                 x509 = 0;
-                e2 = ReadCertificate(&x509, buf2);
+                ReadCertificateNoErr(&x509, buf2);
                 if(x509) {
                     ddocDebug(3, "initCertificateItems", "OCSP Cert item: %d CN: %s file: %s", i, p1, buf1);
                     addCertificateItem(&g_configStore, buf1, x509); // release ownership on x509!

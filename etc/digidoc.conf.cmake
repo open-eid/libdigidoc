@@ -5,7 +5,7 @@
 
 [ca]
 CA_CERT_PATH=@CMAKE_INSTALL_FULL_DATADIR@/libdigidoc
-CA_CERTS=23
+CA_CERTS=17
 
 CA_CERT_1=JUUR-SK.crt
 CA_CERT_1_CN=Juur-SK
@@ -45,19 +45,6 @@ CA_CERT_16_CN=TEST of EID-SK 2011
 CA_CERT_17=TEST KLASS3 2010.crt
 CA_CERT_17_CN=TEST of KLASS3-SK 2010
 
-CA_CERT_18=TEST VRK TEST Root CA.crt
-CA_CERT_18_CN=VRK TEST Root CA
-CA_CERT_19=TEST VRK CA for Test Purposes.crt
-CA_CERT_19_CN=VRK CA for Test Purposes
-
-CA_CERT_20=VRK ROOT.crt
-CA_CERT_20_CN=VRK Gov. Root CA
-CA_CERT_21=VRK CQC.crt
-CA_CERT_21_CN=VRK Gov. CA for Citizen Qualified Certificates
-CA_CERT_22=VRK HCPQC.crt
-CA_CERT_22_CN=VRK CA for Healthcare Professionals Qualified Certificates
-CA_CERT_23=VRK QC.crt
-CA_CERT_23_CN=VRK CA for Qualified Certificates
 
 
 

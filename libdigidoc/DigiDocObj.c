@@ -3192,7 +3192,7 @@ EXP_OPTION int addAllDocInfos(SignedDoc* pSigDoc, SignatureInfo* pSigInfo)
 	memset(buf2, 0, sizeof(buf2));
     l2 = 0;
     encode((const byte*)pDf->mbufDigest.pMem, pDf->mbufDigest.nLen, (byte*)buf2, &l2);
-	ddocDebug(3, "addAllDocInfos", "DF: %d digest \'%s\'", pDf->szId, buf2);
+	ddocDebug(3, "addAllDocInfos", "DF: %s digest \'%s\'", pDf->szId, buf2);
     addDocInfo(&pDocInfo, pSigInfo, pDf->szId,
 	       pDf->szDigestType, (byte*)pDf->mbufDigest.pMem,
 	       pDf->mbufDigest.nLen, buf, len);

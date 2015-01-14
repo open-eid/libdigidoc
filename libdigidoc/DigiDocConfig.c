@@ -1596,7 +1596,7 @@ EXP_OPTION int notarizeSignatureWithIp(SignedDoc* pSigDoc, SignatureInfo* pSigIn
 {
   NotaryInfo* pNotInfo;
   int err = ERR_OK, nCAs = NUM_SEARCH_CAS, i, j, err2 = 0, nType;
-  X509* caCerts[NUM_SEARCH_CAS];
+  X509* caCerts[NUM_SEARCH_CAS+1];
   X509* pNotCert, *pSigCert = 0, *pSigCa = 0;
   //AM 24.09.08 szCA size from 30 to 100 for Portuguese ID card
   char szCN[200], szCA[100];

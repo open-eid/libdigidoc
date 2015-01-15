@@ -78,7 +78,33 @@ Contact for assistance by email abi@id.ee or http://www.id.ee
 
         /usr/local/bin/cdigidoc
 
+### Windows
+
+1. Install dependencies from
+    * [Visual Studio Express 2013 for Windows Desktop](http://www.visualstudio.com/en-us/products/visual-studio-express-vs.aspx)
+	* [Libxml2](http://xmlsoft.org/downloads.html)
+	* [OpenSSL Win32 binaries](https://slproweb.com/products/Win32OpenSSL.html) or [OpenSSL source](https://www.openssl.org/source/)
+	* [ZLib source](http://zlib.net/zlib128.zip)
+2. Fetch the source
+
+        git clone --recursive https://github.com/open-eid/libdigidoc
+        cd libdigidoc
+
+3. Configure
+
+        mkdir build
+        cd build
+        cmake ..
+
+4. Build
+
+        make
+
+5. Execute
+
+        libdigidoc/cdigidoc.exe
+
 ## Support
-Official builds are provided through official distribution point [installer.id.ee](https://installer.id.ee). If you want support, you need to be using official builds.
+Official builds are provided through official distribution point [installer.id.ee](https://installer.id.ee). If you want support, you need to be using official builds. Contact for assistance by email [abi@id.ee](mailto:abi@id.ee) or [www.id.ee](http://www.id.ee).
 
 Source code is provided on "as is" terms with no warranty (see license for more information). Do not file Github issues with generic support requests.

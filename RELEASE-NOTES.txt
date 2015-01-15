@@ -1,6 +1,17 @@
+DigiDoc C library 3.10 release notes
+-----------------------------------
+Changes compared to ver 3.9.1
+
+- Changed validation process of OCSP response so that the responder’s certificate reference is taken from the response instead of the signature’s XML. 
+- Improved DDOC document validation. It is now checked that the issuance time of the OCSP response would be in the validity period of the signer's certificate.
+- Removed duplicate configuration file entry CA_CERT_6 to fix KLASS3-SK 2010 (KLASS3-SK 2010 EECCRCA.crt) certificate's configuration settings.
+- Removed Finnish CA certificates from digidoc.ini default configuration file. It is recommended to use BDOC format and relevant software instead.
+- Development of the software can now be monitored in GitHub environment: https://github.com/open-eid/libdigidoc
+
+
+
 DigiDoc C library 3.9.1 release notes
 -----------------------------------
-
 Changes compared to ver 3.9
 
 - DDOC security fixes:
@@ -10,7 +21,6 @@ Changes compared to ver 3.9
 
 DigiDoc C library 3.9 release notes
 -----------------------------------
-
 Changes compared to ver 3.8
 
 - Improved checking of signer certificate's CA chain length during signature creation and validation. Previously it was not possible to create signature if there was only one CA certificate in the certificate chain.
@@ -33,7 +43,6 @@ Changes compared to ver 3.8
 
 DigiDoc C library 3.8 release notes
 -----------------------------------
-
 Changes compared to ver 3.7.2
 
 - Started using coverity.com static analysis tool to find source code defects and vulnerabilities. Fixed resource leak and NULL pointer problems that were discovered.
@@ -75,8 +84,8 @@ Changes compared to ver 3.7.2
 
 DigiDoc C library 3.7.2 release notes
 --------------------------------------
-
 Changes compared to ver 3.7.1.992
+
 - DDOC/CDOC security fixes:
   - Fixed the opening of DDOC container with a faulty DataFile name tag. This is a highly relevant security fix having an effect on the verification of DDOC files. The unfixed library can result in overwrite arbitrary files on the system with the privileges of the victim.
 
@@ -84,16 +93,16 @@ Changes compared to ver 3.7.1.992
 
 DigiDoc C library 3.7.1 release notes
 -----------------------------------
-
 Changes compared to ver 3.7.0.910
+
 - Changed the handling of DigiDoc container which has no xmlns attribute in the <DataFile> element.
 
 
 
 DigiDoc C library 3.7 release notes
 -----------------------------------
-
 Changes compared to ver 3.6.0.26
+
 - Added the support of slot choice option for CDOC decryption with utility
 - Fixed the search of the signer’s certificate issuer for DDOC verification
 - Fixed the OCSP hash check error handling for DDOC verification: error messages are correct when there are several errors associated with a container
@@ -135,8 +144,8 @@ Changes compared to ver 3.6.0.26
 
 DigiDoc C library 3.6 release notes
 -----------------------------------
-
 Changes compared to ver 2.6.0.18
+
 - Changes according ETSI Plug test results
 - Changes according Cross library (jdigidoc & libdigidoc & libdigidocpp) test results (DDOC, CDOC)
 - Removed DETACHED, HASHCODE, DDOC 1.4, BDOC support

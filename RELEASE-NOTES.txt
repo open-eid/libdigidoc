@@ -7,11 +7,9 @@ Changes compared to ver 3.9.1
 - Removed duplicate configuration file entry CA_CERT_6 to fix KLASS3-SK 2010 (KLASS3-SK 2010 EECCRCA.crt) certificate's configuration settings.
 - Removed Finnish CA certificates from digidoc.ini default configuration file. It is recommended to use BDOC format and relevant software instead.
 - Development of the software can now be monitored in GitHub environment: https://github.com/open-eid/libdigidoc
-- ddoc 1.0 format validation fails on ubuntu LTS upgrade 14.4.1 and newer.
-Problem does not exist on ubuntu 14.4, osx or windows.
-If openssl is upgraded to openssl_1.0.1f-1ubuntu2.8 then prolem appares.
-Validation still works with openssl_1.0.1f-1ubuntu2.7.
-This concerns only ddoc 1.0 signatures and not newer formats.
+
+Known issues:
+- Validation of documents in DDOC 1.0 format fails on Ubuntu LTS upgrade 14.4.1 and newer due to incompatibility in OpenSSL base library openssl_1.0.1f-1ubuntu2.8. The problem does not occur on Ubuntu 14.4 with openssl_1.0.1f-1ubuntu2.7, OSX and Windows platforms.
 
 
 

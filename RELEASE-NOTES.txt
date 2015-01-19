@@ -4,6 +4,8 @@ Changes compared to ver 3.9.1
 
 - Changed validation process of OCSP response so that the responder’s certificate reference is taken from the response instead of the signature’s XML. 
 - Improved DDOC document validation. It is now checked that the issuance time of the OCSP response would be in the validity period of the signer's certificate.
+- Changed the validation of DDOC documents so that multiple data files with the same name would be allowed in the container.
+- Improved utility program's output during DDOC document validation. If the signer's certificate is from live CA chain but OCSP confirmation has been issued from test OCSP responder then warning 172 "Signer from LIVE CA-chain but OCSP from TEST CA-chain!" is returned. 
 - Removed duplicate configuration file entry CA_CERT_6 to fix KLASS3-SK 2010 (KLASS3-SK 2010 EECCRCA.crt) certificate's configuration settings.
 - Removed Finnish CA certificates from digidoc.ini default configuration file. It is recommended to use BDOC format and relevant software instead.
 - Development of the software can now be monitored in GitHub environment: https://github.com/open-eid/libdigidoc

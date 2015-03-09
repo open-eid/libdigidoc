@@ -148,7 +148,7 @@ typedef	unsigned char	byte;
 #define DDOC_LANG_ENGLISH           0
 #define DDOC_LANG_ESTONIAN          1
 #define DDOC_NUM_LANGUAGES          2
-#define SUPPORTED_VERSION_COUNT		5
+#define SUPPORTED_VERSION_COUNT		4
 
 //==========< file formats >=======================
 

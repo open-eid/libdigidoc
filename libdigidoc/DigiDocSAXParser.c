@@ -2076,7 +2076,7 @@ static void charactersHandler(void *ctx, const xmlChar *ch, int len)
   if(pctx->bCollectSigData) {
     if(!pctx->errcode) {
       p = 0;
-      pctx->errcode = escapeXMLSymbols((const char*)ch, len, &p);
+      pctx->errcode = escapeTextNode((const char*)ch, len, &p);
       pctx->errcode = ddocMemAppendData(&(pctx->mbufSigData), p, -1);
       free(p);
     }

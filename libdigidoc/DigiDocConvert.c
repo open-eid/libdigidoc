@@ -24,6 +24,7 @@
 #include <libdigidoc/DigiDocConvert.h>
 #include <libdigidoc/DigiDocError.h>
 #include <libdigidoc/DigiDocMem.h>
+#include <libdigidoc/DigiDocGen.h>
 
 #ifdef WIN32
   #include <windows.h>

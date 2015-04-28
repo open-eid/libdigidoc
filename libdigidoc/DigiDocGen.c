@@ -426,6 +426,75 @@ char* canonicalizeXMLBlock(char* source, int len, char* block, char* prefix)
   return dest;
 }
 
+//--------------------------------------------------
+// Helper function that escapes XML special chars in xml element body
+// src - input data
+// srclen - length of input data. Use -1 for 0 terminated strings
+// dest - address of output buffer. Caller is responsible for deallocating it!
+// returns error code or ERR_OK
+//--------------------------------------------------
+int escapeTextNode(const char* src, int srclen, char** dest)
+{
+    int j, i, n = srclen, l;
+    char *p = 0;
+    
+    RETURN_IF_NULL_PARAM(src);
+    RETURN_IF_NULL_PARAM(dest);
+    *dest = 0;
+    if(n < 0)
+        n = strlen(src);
+    if(n > 0 && ConfigItem_lookup_int("DEBUG_LEVEL", 1) >= 5) {
+        p = (char*)malloc(n+1);
+        if(p) {
+            memset(p, 0, n+1);
+            memcpy(p, src, n);
+            ddocDebug(5, "escapeTextNode", "src: \"%s\" len: %d", p, n);
+            free(p);
+        }
+    }
+    else
+        ddocDebug(5, "escapeTextNode", "src: \"%s\" len: %d", src, n);
+    // count the amount of memory needed for conversion
+    for(i = l = 0; i < n; i++) {
+        switch(src[i]) {
+            case '<': l += 4; break;
+            case '>': l += 4; break;
+            case '&': l += 5; break;
+            case '\r': l += 5; break;
+            default: l ++; break;
+        }
+    }
+    // count the last terminator char
+    l++;
+    ddocDebug(5, "escapeTextNode", "allocating: %d bytes", l);
+    *dest = (char*)malloc(l);
+    memset(*dest, 0, l);
+    // now convert the data
+    for(i = j = 0; i < n; i++) {
+        switch(src[i]) {
+            case '<': strncat(*dest, "&lt;", l - strlen(*dest)); j += 4; break;
+            case '>': strncat(*dest, "&gt;", l - strlen(*dest)); j += 4; break;
+            case '&':
+                if(src[i+3] != ';' && src[i+4] != ';' && src[i+5] != ';') {
+                    if(src[i+1] != '#') {
+                        strncat(*dest, "&amp;", l - strlen(*dest)); j += 5; break;
+                    } else {
+                        if(!strncmp(src+i, "&#38;", 5)) {
+                            strncat(*dest, "&amp;", l - strlen(*dest)); j += 5; i += 4; break;
+                        }
+                        // but others?
+                    }
+                } else {
+                    (*dest)[j] = src[i]; j++;
+                }
+                break;
+            case '\r': strncat(*dest, "&#xD;", l - strlen(*dest)); j += 5; break;
+            default: (*dest)[j] = src[i]; j++; break;
+        }
+    }
+    ddocDebug(4, "escapeTextNode", "Src: %s Converted: \'%s\' len: %d", src, *dest, j);
+    return ERR_OK;
+}
 
 //--------------------------------------------------
 // Helper function that escapes XML special chars
@@ -613,7 +682,7 @@ char* createXMLSignedProperties(const SignedDoc* pSigDoc, const SignatureInfo* p
     pN1 = xmlNewChild(pSigSigProp, NULL, (const xmlChar*)"SignatureProductionPlace", nl);
     if(pSigInfo->sigProdPlace.szCity) {
       if(bWithEscapes) {
-	escapeXMLSymbols(pSigInfo->sigProdPlace.szCity, -1, &p2);
+	escapeTextNode(pSigInfo->sigProdPlace.szCity, -1, &p2);
 	pN2 = xmlNewChild(pN1, NULL, (const xmlChar*)"City", (const xmlChar*)p2);
 	free(p2);
       }
@@ -623,7 +692,7 @@ char* createXMLSignedProperties(const SignedDoc* pSigDoc, const SignatureInfo* p
     }
     if(pSigInfo->sigProdPlace.szStateOrProvince) {
       if(bWithEscapes) {
-	escapeXMLSymbols(pSigInfo->sigProdPlace.szStateOrProvince, -1, &p2);
+	escapeTextNode(pSigInfo->sigProdPlace.szStateOrProvince, -1, &p2);
 	pN2 = xmlNewChild(pN1, NULL, (const xmlChar*)"StateOrProvince", (const xmlChar*)p2);
 	free(p2);
       }
@@ -633,7 +702,7 @@ char* createXMLSignedProperties(const SignedDoc* pSigDoc, const SignatureInfo* p
     }
     if(pSigInfo->sigProdPlace.szPostalCode) {
       if(bWithEscapes) {
-	escapeXMLSymbols(pSigInfo->sigProdPlace.szPostalCode, -1, &p2);
+	escapeTextNode(pSigInfo->sigProdPlace.szPostalCode, -1, &p2);
 	pN2 = xmlNewChild(pN1, NULL, (const xmlChar*)"PostalCode", (const xmlChar*)p2);
 	free(p2);
       }
@@ -643,7 +712,7 @@ char* createXMLSignedProperties(const SignedDoc* pSigDoc, const SignatureInfo* p
     }
     if(pSigInfo->sigProdPlace.szCountryName) {
       if(bWithEscapes) {
-	escapeXMLSymbols(pSigInfo->sigProdPlace.szCountryName, -1, &p2);
+	escapeTextNode(pSigInfo->sigProdPlace.szCountryName, -1, &p2);
 	pN2 = xmlNewChild(pN1, NULL, (const xmlChar*)"CountryName", (const xmlChar*)p2);
 	free(p2);
       }
@@ -662,7 +731,7 @@ char* createXMLSignedProperties(const SignedDoc* pSigDoc, const SignatureInfo* p
       pN2 = xmlNewChild(pN1, NULL, (const xmlChar*)"ClaimedRoles", nl);
       for(i = 0; i < pSigInfo->signerRole.nClaimedRoles; i++) {
 	if(bWithEscapes) {
-	  escapeXMLSymbols(pSigInfo->signerRole.pClaimedRoles[i], -1, &p2);
+	  escapeTextNode(pSigInfo->signerRole.pClaimedRoles[i], -1, &p2);
 	  ddocDebug(4, "createXMLSignedProperties", "role: %s --> %s", pSigInfo->signerRole.pClaimedRoles[i], p2);
 	  pN3 = xmlNewChild(pN2, NULL, (const xmlChar*)"ClaimedRole", (const xmlChar*)p2);
 	  free(p2);

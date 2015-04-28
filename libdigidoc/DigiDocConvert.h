@@ -87,8 +87,6 @@ EXP_OPTION void unicode2ascii(const char* uni, char* dest);
 // converts unicode escapes string to UTF8
 EXP_OPTION void unicodeEscapes2utf8(const char* uni, char* dest);
 
-// replaces xml special symbols with escapes
-int escapeXMLSymbols(const char* src, int srclen, char** dest);
     
 char* escape2xmlsym(const char* src);
 

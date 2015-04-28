@@ -107,6 +107,26 @@ int ddocGen_endElem(DigiDocMemBuf* pBuf, const char* elemName);
 // returns error code or ERR_OK
 //--------------------------------------------------
 int ddocGen_addAtribute(DigiDocMemBuf* pBuf, const char* name, const char* value);
+    
+    
+//--------------------------------------------------
+// Helper function that escapes XML special chars
+// src - input data
+// srclen - length of input data. Use -1 for 0 terminated strings
+// dest - address of output buffer. Caller is responsible for deallocating it!
+// returns error code or ERR_OK
+//--------------------------------------------------
+int escapeXMLSymbols(const char* src, int srclen, char** dest);
+ 
+//--------------------------------------------------
+// Helper function that escapes XML special chars in xml element body
+// src - input data
+// srclen - length of input data. Use -1 for 0 terminated strings
+// dest - address of output buffer. Caller is responsible for deallocating it!
+// returns error code or ERR_OK
+//--------------------------------------------------
+int escapeTextNode(const char* src, int srclen, char** dest);
+    
 
 //================< functions generating DigiDoc formats 1.0 - 1.3 > =================================
 

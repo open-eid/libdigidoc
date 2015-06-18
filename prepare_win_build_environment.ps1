@@ -1,11 +1,11 @@
-#powershell -ExecutionPolicy ByPass -File prepare_win_build_environment.ps1 [-openssl] [-libxml] [-zlib]
+#powershell -ExecutionPolicy ByPass -File prepare_win_build_environment.ps1 [-openssl] [-libxml2] [-zlib]
 param(
 	[string]$target = "C:\build",
 	[string]$msbuild = "C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe",
 	[string]$7zip = "C:\Program Files\7-Zip\7z.exe",
 	[string]$cmake = "C:\Program Files (x86)\CMake\bin\cmake.exe",
 	[string]$vcvars = "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat", #$env:VCINSTALLDIR
-	[string]$opensslver = "openssl-1.0.1m",
+	[string]$opensslver = "openssl-1.0.2d",
 	[string]$libxml2ver = "libxml2-2.9.2",
 	[string]$zlibver = "zlib-1.2.8",
 	[switch]$openssl = $false,
@@ -44,21 +44,21 @@ function libxml2() {
 	& $7zip x "$libxml2ver.tar.gz"
 	& $7zip x "$libxml2ver.tar"
 	foreach($item in $shell.NameSpace("$libdigidoc\$libxml2ver-patches.zip").items()) {
-		$shell.Namespace($libdigidoc).CopyHere($item,0x14)
+		$shell.Namespace($target).CopyHere($item,0x14)
 	}
 
 	Push-Location -Path "$libxml2ver\win32"
-	& cscript configure.js "iconv=no" "iso8859x=yes" "prefix=$target\libxml2\x86"
+	& cscript configure.js iconv=no iso8859x=yes "prefix=$target\libxml2\x86"
 	& $vcvars x86 "&&" nmake -f Makefile.msvc install
 	Pop-Location
 	Remove-Item $libxml2ver -Force -Recurse
 	& $7zip x "$libxml2ver.tar"
 	foreach($item in $shell.NameSpace("$libdigidoc\$libxml2ver-patches.zip").items()) {
-		$shell.Namespace($libdigidoc).CopyHere($item,0x14)
+		$shell.Namespace($target).CopyHere($item,0x14)
 	}
 
 	Push-Location -Path "$libxml2ver\win32"
-	& cscript configure.js "iconv=no" "iso8859x=yes" "prefix=$target\libxml2\x64"
+	& cscript configure.js iconv=no iso8859x=yes "prefix=$target\libxml2\x64"
 	& $vcvars x86_amd64 "&&" nmake -f Makefile.msvc install
 	Pop-Location
 	Remove-Item $libxml2ver -Force -Recurse
@@ -89,7 +89,7 @@ if($libxml2) {
 	libxml2
 }
 if($zlib) {
-	libxml2
+	zlib
 }
 if(!$openssl -and !$libxml2 -and !$zlib) {
 	openssl

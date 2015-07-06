@@ -28,6 +28,7 @@
 #include "DigiDocError.h"
 #include "DigiDocCert.h"
 #include "DigiDocGen.h"
+#include "DigiDocObj.h"
 
 
 #include <openssl/sha.h>
@@ -1341,20 +1342,19 @@ int setup_verifyCERT(X509_STORE **newX509_STORE,
   lookup = X509_STORE_add_lookup(store,X509_LOOKUP_file());
   if (lookup == NULL) goto end;
   for(i = 0; certs && certs[i]; i++) {
-    ddocDebug(4, "setup_verifyCERT", "add cert: %d cert: %s", i, (certs[i] ? "OK" : "NULL"));
+    ddocDebug(3, "setup_verifyCERT", "add cert: %d cert: %s", i, (certs[i] ? "OK" : "NULL"));
     ddocCertGetSubjectDN((X509*)certs[i], &mbuf1);
-    ddocDebug(4, "setup_verifyCERT", "add cert: %d cert: %s", i, (char*)mbuf1.pMem);
+    ddocDebug(3, "setup_verifyCERT", "add cert: %d cert: %s", i, (char*)mbuf1.pMem);
     X509_STORE_add_cert(store, (X509*)certs[i]);
     ddocMemBuf_free(&mbuf1);
   }
-   ddocDebug(4, "setup_verifyCERT", "certs added");
+   ddocDebug(3, "setup_verifyCERT", "certs added");
   lookup=X509_STORE_add_lookup(store,X509_LOOKUP_hash_dir());
   if (lookup == NULL) goto end;
   if (CApath) {
-     ddocDebug(4, "setup_verifyCERT", "lookup dir: %s", CApath);
+     ddocDebug(3, "setup_verifyCERT", "lookup dir: %s", CApath);
     if(!X509_LOOKUP_add_dir(lookup,CApath,X509_FILETYPE_PEM)) {
       //BIO_printf(bp, "Error loading directory %s\n", CApath);
-      printf("Error loading directory %s\n", CApath);
       goto end;
     }
   } else X509_LOOKUP_add_dir(lookup,NULL,X509_FILETYPE_DEFAULT);
@@ -1487,6 +1487,7 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
   X509 *certNotaryDirectCA = 0, *pCert = 0, *pCaCert = 0;
   DigiDocMemBuf mbuf1;
     char buf1[100], buf3[500];
+  time_t tProdAt;
     
   mbuf1.pMem = 0;
   mbuf1.nLen = 0;
@@ -1500,7 +1501,7 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
   for(l1 = 0; caCerts && caCerts[l1]; l1++);
   if(l1 < 1)
     SET_LAST_ERROR_RETURN_CODE(ERR_CERT_INVALID);
-  certNotaryDirectCA = (X509*)caCerts[l1-1];	
+  certNotaryDirectCA = (X509*)caCerts[l1-1];
   // do the signature values match?
   // not to be checked in format 1.4
   if(err) return err;
@@ -1514,6 +1515,9 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
   // debug
   //WriteOCSPResponse("test2.resp", pResp);
   if((setup_verifyCERT(&store, CApath, caCerts)) == ERR_OK) {
+    ddocNotInfo_GetProducedAt_timet(pNotInfo, &tProdAt);
+    X509_VERIFY_PARAM_set_time(store->param, tProdAt);
+    X509_STORE_set_flags(&store, X509_V_FLAG_USE_CHECK_TIME);
     // new basic response
     // create OCSP basic response
     // in version 1.0 we calculated digest over tbsResponseData
@@ -1524,18 +1528,22 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
       if (ver_certs) {
           ReadCertSerialNumber(buf1, sizeof(buf1), (X509*)notCert);
           ddocCertGetSubjectDN((X509*)notCert, &mbuf1);
-	sk_X509_push(ver_certs, notCert);
-	err = OCSP_basic_verify(bs, ver_certs, store, OCSP_TRUSTOTHER); //OCSP_NOCHAIN);
-    ddocDebug(3, "verifyNotaryInfoCERT", "OCSP verify: %d, not cet: %s cn: %s", err, buf1, mbuf1.pMem);
-          ddocMemBuf_free(&mbuf1);
-	if(err == ERR_LIB_NONE) {
-	  err = ERR_OK;
-	} else {
-	  err = ERR_NOTARY_SIG_MATCH;
-	  SET_LAST_ERROR(err);
-	}
-	// cleanup
-	sk_X509_free(ver_certs);
+          sk_X509_push(ver_certs, notCert);
+          // fix invalid padding flag on ddoc 1.0 signatures
+          if(((!strcmp(pSigDoc->szFormatVer, SK_XML_1_VER) && !strcmp(pSigDoc->szFormat, SK_XML_1_NAME))
+             || (pSigInfo->nErr1 == ERR_VER_1_0)) && (bs->signature->flags & 0x07)) {
+              bs->signature->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT|0x07);
+          }
+          err = OCSP_basic_verify(bs, ver_certs, store, OCSP_NOCHECKS);
+          ddocDebug(3, "verifyNotaryInfoCERT", "OCSP verify: %d, not cet: %s cn: %s", err, buf1, mbuf1.pMem);
+          if(err == ERR_LIB_NONE) {
+              err = ERR_OK;
+          } else {
+              err = ERR_NOTARY_SIG_MATCH;
+              SET_LAST_ERROR(err);
+          }
+          // cleanup
+          sk_X509_free(ver_certs);
       }
       if(bs) OCSP_BASICRESP_free(bs);
     }
@@ -1544,6 +1552,10 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
     err = ERR_CERT_STORE_READ;
     SET_LAST_ERROR(err);
   }
+  if(pSigInfo->nErr1 == ERR_VER_1_0)
+    ((SignatureInfo*)pSigInfo)->nErr1 = 0;
+  ddocDebug(3, "verifyNotaryInfoCERT", "OCSP verify final: %d, not cet: %s cn: %s", err, buf1, mbuf1.pMem);
+  ddocMemBuf_free(&mbuf1);
   if(err == ERR_OK) {
 	ddocDebug(9, "verifyNotaryInfoCERT", "ddocSigInfo_GetOCSPRespondersCert start");
 	//if(!notCert) // ???

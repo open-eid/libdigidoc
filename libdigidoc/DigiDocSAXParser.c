@@ -1245,6 +1245,8 @@ int checkValidDigestValPath(SigDocParse* pctx, SignatureInfo* pSigInfo)
 {
     if(pctx && pctx->mbufTags.pMem) {
         if(!strcmp((const char*)pctx->mbufTags.pMem, PATH_DIGEST_VALUE_CERT_REF_1_0)) {
+            pSigInfo->nErr1 = ERR_VER_1_0;
+            ddocDebug(1, "VER 1.0", "Ver 1.0 signature! Found element DigestValue in path: %s format: %s ver: %s", (const char*)pctx->mbufTags.pMem, pctx->pSigDoc->szFormat, pctx->pSigDoc->szFormatVer);
             if(strcmp(pctx->pSigDoc->szFormat, SK_XML_1_NAME) &&
                (strcmp(pctx->pSigDoc->szFormat, DIGIDOC_XML_1_1_NAME) ||
                 !strcmp(pctx->pSigDoc->szFormatVer, DIGIDOC_XML_1_3_VER))) {

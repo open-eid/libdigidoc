@@ -105,7 +105,8 @@ typedef struct CertIDList_st {
 #define CERTID_VALUE_TSA_CERT            3
 //AM 12.03.08
 #define CERTID_TYPE_CA_CERTID            4
-
+#define ERR_VER_1_0                     300
+    
 typedef struct CertValue_st {
   int nType;
   char* szId;

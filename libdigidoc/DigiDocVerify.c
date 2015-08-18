@@ -1517,7 +1517,7 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
   if((setup_verifyCERT(&store, CApath, caCerts)) == ERR_OK) {
     ddocNotInfo_GetProducedAt_timet(pNotInfo, &tProdAt);
     X509_VERIFY_PARAM_set_time(store->param, tProdAt);
-    X509_STORE_set_flags(&store, X509_V_FLAG_USE_CHECK_TIME);
+    X509_STORE_set_flags(store, X509_V_FLAG_USE_CHECK_TIME);
     // new basic response
     // create OCSP basic response
     // in version 1.0 we calculated digest over tbsResponseData

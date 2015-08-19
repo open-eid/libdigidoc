@@ -1529,9 +1529,11 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
           ReadCertSerialNumber(buf1, sizeof(buf1), (X509*)notCert);
           ddocCertGetSubjectDN((X509*)notCert, &mbuf1);
           sk_X509_push(ver_certs, notCert);
+          ddocDebug(3, "verifyNotaryInfoCERT", "OCSP verify err: %d, err1: %d format: %s", err, pSigInfo->nErr1, pSigDoc->szFormatVer);
           // fix invalid padding flag on ddoc 1.0 signatures
-          if(((!strcmp(pSigDoc->szFormatVer, SK_XML_1_VER) && !strcmp(pSigDoc->szFormat, SK_XML_1_NAME))
-             || (pSigInfo->nErr1 == ERR_VER_1_0)) && (bs->signature->flags & 0x07)) {
+          if((!strcmp(pSigDoc->szFormatVer, SK_XML_1_VER) && !strcmp(pSigDoc->szFormat, SK_XML_1_NAME))
+             || (bs->signature->flags & 0x07)) {
+              ddocDebug(3, "verifyNotaryInfoCERT", "Reset ocsp flag %d", bs->signature->flags);
               bs->signature->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT|0x07);
           }
           err = OCSP_basic_verify(bs, ver_certs, store, OCSP_NOCHECKS);

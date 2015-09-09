@@ -1,3 +1,12 @@
+DigiDoc C library 3.10.1 release notes
+-----------------------------------
+Changes compared to ver 3.10
+
+- Fixed ddoc format and version checking. The unfixed library can crash when reading a ddoc file with unknown format and/or version value. Sertifitseerimiskeskus and RIA thank Aivar Liimets for his contribution.
+- Fixed validation of DDOC 1.0-1.2 documents that were created with older version of DigiDoc3 Client (with only DDOC 1.0 format support) on Ubuntu and OSX due to incompatibility with OpenSSL base library openssl_1.0.1f. (IB-3997)
+
+
+
 DigiDoc C library 3.10 release notes
 -----------------------------------
 Changes compared to ver 3.9.1

@@ -45,7 +45,7 @@ if( MSVC )
     )
 endif()
 
-add_library( digidoc SHARED
+add_library( digidoc ${BUILD_TYPE}
 	${PUBLIC_HEADER}
 	${CMAKE_CURRENT_BINARY_DIR}/${DIGIDOC_CONF_NAME}
 	${libdigidoc_SRCS}
@@ -93,9 +93,11 @@ set_target_properties( digidoc PROPERTIES
 	MACOSX_RPATH YES
 )
 
-add_executable(cdigidoc cdigidoc.c cdigidoc.rc)
-set_target_properties(cdigidoc PROPERTIES INSTALL_RPATH "@loader_path/../../../..;@loader_path/../..")
-target_link_libraries(cdigidoc digidoc)
+if( BUILD_TOOLS )
+	add_executable(cdigidoc cdigidoc.c cdigidoc.rc)
+	set_target_properties(cdigidoc PROPERTIES INSTALL_RPATH "@loader_path/../../../..;@loader_path/../..")
+	target_link_libraries(cdigidoc digidoc)
+endif()
 
 install( TARGETS digidoc
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -136,12 +138,14 @@ if( FRAMEWORK )
 		COMMAND zip -r ${CMAKE_BINARY_DIR}/libdigidoc-dbg_${VERSION}$ENV{VER_SUFFIX}.zip libdigidoc.dSYM
 	)
 else()
-	install( TARGETS cdigidoc DESTINATION ${CMAKE_INSTALL_BINDIR} )
 	configure_file( libdigidoc.pc.cmake libdigidoc.pc @ONLY )
-	configure_file( cdigidoc.1.cmake cdigidoc.1 )
 	install( FILES ${CMAKE_CURRENT_BINARY_DIR}/libdigidoc.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig )
-	install( FILES ${CMAKE_CURRENT_BINARY_DIR}/cdigidoc.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
 	install( FILES ${CERTS} DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/libdigidoc )
+	if( BUILD_TOOLS )
+		install( TARGETS cdigidoc DESTINATION ${CMAKE_INSTALL_BINDIR} )
+		configure_file( cdigidoc.1.cmake cdigidoc.1 )
+		install( FILES ${CMAKE_CURRENT_BINARY_DIR}/cdigidoc.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+	endif()
 endif()
 
 #install( FILES

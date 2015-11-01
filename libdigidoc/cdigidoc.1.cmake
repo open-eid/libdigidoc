@@ -200,7 +200,7 @@ Decrypts and possibly decompresses the encrypted file just read in and writes to
 Input file (required) specifies the input file’s name.
 Pin (required) represents the recipient’s pin1 (in context of Estonian ID cards). 
 pkcs12-file (optional) specifies the PKCS#12 file if decrypting is done with a software token.
-slot deafult is slot 0 containing Estonian ID cards authentication keypair. This parameter can be used to decrypt with a key from the second id card attached to the computer etc.
+slot default is slot 0 containing Estonian ID cards authentication keypair. This parameter can be used to decrypt with a key from the second id card attached to the computer etc.
 Note: There are also alternative commands for decryption, depending on the encrypted file’s format, size and the certificate type used for decrypting it.
 .RS
 .TP
@@ -209,7 +209,7 @@ Offers same functionality as -decrypt-sk, should be used for decrypting small fi
 Input file (required) specifies the input file’s name.
 Pin (required) represents the recipient’s pin1 (in contexts of Estonian ID cards).
 pkcs12-file (optional) specifies the PKCS#12 file if decrypting is done with a software token.
-slot deafult is slot 0 containing Estonian ID cards authentication keypair. This parameter can be used to decrypt with a key from the second id card attached to the computer etc.
+slot default is slot 0 containing Estonian ID cards authentication keypair. This parameter can be used to decrypt with a key from the second id card attached to the computer etc.
 .TP
 .I "-decrypt-file <input-file> <output-file> <pin> [pkcs12-file]"
 Offers same functionality as -decrypt for decrypting documents, should be used for decrypting large files (which do not need to be inside a DigiDoc container). Expects the encrypted data not to be compressed. Note that the command is not currently tested.

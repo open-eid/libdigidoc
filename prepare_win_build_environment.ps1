@@ -5,8 +5,8 @@ param(
 	[string]$7zip = "C:\Program Files\7-Zip\7z.exe",
 	[string]$cmake = "C:\Program Files (x86)\CMake\bin\cmake.exe",
 	[string]$vcvars = "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat", #$env:VCINSTALLDIR
-	[string]$opensslver = "openssl-1.0.2d",
-	[string]$libxml2ver = "libxml2-2.9.2",
+	[string]$opensslver = "openssl-1.0.2e",
+	[string]$libxml2ver = "libxml2-2.9.3",
 	[string]$zlibver = "zlib-1.2.8",
 	[switch]$openssl = $false,
 	[switch]$libxml2 = $false,
@@ -15,7 +15,7 @@ param(
 
 $libdigidoc = split-path -parent $MyInvocation.MyCommand.Definition
 if(!(Test-Path -Path $target)){
-    New-Item -ItemType directory -Path $target
+	New-Item -ItemType directory -Path $target
 }
 Push-Location -Path $target
 
@@ -43,9 +43,6 @@ function libxml2() {
 	$client.DownloadFile("http://xmlsoft.org/sources/$libxml2ver.tar.gz", "$target\$libxml2ver.tar.gz")
 	& $7zip x "$libxml2ver.tar.gz"
 	& $7zip x "$libxml2ver.tar"
-	foreach($item in $shell.NameSpace("$libdigidoc\$libxml2ver-patches.zip").items()) {
-		$shell.Namespace($target).CopyHere($item,0x14)
-	}
 
 	Push-Location -Path "$libxml2ver\win32"
 	& cscript configure.js iconv=no iso8859x=yes "prefix=$target\libxml2\x86"

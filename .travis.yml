@@ -9,23 +9,37 @@ script:
 - cd build
 - cmake ..
 - make
+- cd ..
 
 os:
- - linux
- - osx
+- linux
+- osx
 
 env:
   global:
-   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-   #   via the "travis encrypt" command using the project repo's public key
-   - secure: "AhDg868E2SgZbGhsFyDQd19IVCZcQ2a7shdojRTxIxF10TGhAleFEtm4EAoXjjgCPcGY52o1aVaEMea/GRnLR6oLQ592igxNHjTlTGKcDp5w28xVq9m7d4JVrvUeYvKoi+szS4Ah8zhraGdssMaq8LtZzLbaoEXCaMCDRlXPGro="
-
+  - secure: AhDg868E2SgZbGhsFyDQd19IVCZcQ2a7shdojRTxIxF10TGhAleFEtm4EAoXjjgCPcGY52o1aVaEMea/GRnLR6oLQ592igxNHjTlTGKcDp5w28xVq9m7d4JVrvUeYvKoi+szS4Ah8zhraGdssMaq8LtZzLbaoEXCaMCDRlXPGro=
 addons:
   coverity_scan:
     project:
-      name: "open-eid/libdigidoc"
-      description: "Build submitted via Travis CI"
+      name: open-eid/libdigidoc
+      description: Build submitted via Travis CI
     notification_email: raul@metsma.ee
-    build_command_prepend: "mkdir coverity; cd coverity; cmake .."
+    build_command_prepend: mkdir coverity; cd coverity; cmake ..
     build_command: make
     branch_pattern: coverity_scan
+
+before_deploy:
+- export VERSION=${TRAVIS_TAG:1}
+- rm -rf build
+- cd ..
+- mv libdigidoc libdigidoc-${VERSION}
+- tar czf libdigidoc-${VERSION}.tar.gz --exclude-vcs libdigidoc-${VERSION}
+deploy:
+  provider: releases
+  api_key:
+    secure: GwHhMH2ha01kUpsB4M4xvqKQPhKkJucESHYzR+ga8gegm4Td74QQ+WMNZ16IZQwTl4DTa2OqlLPm0JryWnLRjJeifweV4PJFcByMv/lZt589T09saZ742C9jzZk5J7u+4m+g8lgjESofxLDV24AcGFGuAXuT+qTIeAIXBw32WHw=
+  file: libdigidoc-${VERSION}.tar.gz
+  skip_cleanup: true
+  on:
+    tags: true
+    condition: "$TRAVIS_OS_NAME = linux"

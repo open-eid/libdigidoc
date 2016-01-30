@@ -310,7 +310,6 @@ EXP_OPTION int initConfigStore(const char* szConfigFile)
 			  snprintf(g_szGlobalConfigFile, _MAX_PATH, "%s/%s", g_frameworkResources, DIGIDOC_CONF_NAME);
 		  CFRelease(url);
 	  }
-	  CFRelease(bundle);
   }
   CFRelease(identifier);
 #endif

@@ -35,10 +35,10 @@ Pre-Depends:
  ${misc:Pre-Depends}
 Depends:
  libdigidoc-common (= ${binary:Version}),
- opensc,
- pcscd,
  ${misc:Depends},
  ${shlibs:Depends}
+Recommends:
+ opensc
 Description: DigiDoc digital signature library
  DigiDoc is an XML file format for documents with digital signatures in use by
  the Estonian ID card infrastructure. This library allows for creation and

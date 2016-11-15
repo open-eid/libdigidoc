@@ -103,7 +103,37 @@ Contact for assistance by email abi@id.ee or http://www.id.ee
 5. Execute
 
         libdigidoc/cdigidoc.exe
+	
+### Fedora 24
 
+1. Install dependencies
+
+        sudo dnf install cmake libxml2-devel openssl-devel doxygen enca-devel zlib-devel opencryptoki-devel
+	install libiconv http://savannah.gnu.org/projects/libiconv/
+
+2. Fetch the source
+
+        git clone --recursive https://github.com/open-eid/libdigidoc
+        cd libdigidoc
+
+3. Configure
+
+        mkdir build
+        cd build
+        cmake ..
+
+4. Build
+
+        make
+
+5. Install
+
+        sudo make install
+
+6. Execute
+
+        /usr/local/bin/cdigidoc
+        
 ## Support
 Official builds are provided through official distribution point [installer.id.ee](https://installer.id.ee). If you want support, you need to be using official builds. Contact for assistance by email [abi@id.ee](mailto:abi@id.ee) or [www.id.ee](http://www.id.ee).
 

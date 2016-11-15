@@ -109,7 +109,7 @@ Contact for assistance by email abi@id.ee or http://www.id.ee
 1. Install dependencies
 
         sudo dnf install cmake libxml2-devel openssl-devel doxygen enca-devel zlib-devel opencryptoki-devel
-	install libiconv http://savannah.gnu.org/projects/libiconv/
+	install libiconv from source http://savannah.gnu.org/projects/libiconv/
 
 2. Fetch the source
 

@@ -109,9 +109,9 @@ Contact for assistance by email abi@id.ee or http://www.id.ee
 1. Install dependencies
 
         sudo dnf install cmake libxml2-devel doxygen enca-devel zlib-devel opencryptoki-devel
-	-install libiconv from source http://savannah.gnu.org/projects/libiconv/ 
+	- install libiconv from source http://savannah.gnu.org/projects/libiconv/ 
 	  or get it from https://pkgs.org/fedora-24/forensics-x86_64/libiconv-1.14-3.fc24.x86_64.rpm.html
-	-build and install openssl0.9.8 from https://github.com/openssl/openssl/archive/OpenSSL_0_9_8zh.tar.gz 
+	- build and install openssl0.9.8 from https://github.com/openssl/openssl/archive/OpenSSL_0_9_8zh.tar.gz 
 	  or ensure 0.9.8 interfaces are available by configuring with --api=0.9.8 see 
 	  https://wiki.openssl.org/index.php/1.1_API_Changes and https://github.com/rbsec/sslscan/issues/108  
 

@@ -2,7 +2,6 @@ cmake_minimum_required( VERSION 2.8 )
 project( libdigidoc )
 
 set( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules" )
-set( CMAKE_FIND_ROOT_PATH ${CMAKE_OSX_SYSROOT} )
 set( INSTALL_DOC false CACHE BOOL "Install documentation" )
 set( BUILD_TOOLS true CACHE BOOL "Build digidoc-tool" )
 set( BUILD_TYPE "SHARED" CACHE STRING "Build library as SHARED/STATIC" )

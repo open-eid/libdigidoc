@@ -95,7 +95,6 @@ set_target_properties( digidoc PROPERTIES
 
 if( BUILD_TOOLS )
 	add_executable(cdigidoc cdigidoc.c cdigidoc.rc)
-	set_target_properties(cdigidoc PROPERTIES INSTALL_RPATH "@loader_path/../../../..;@loader_path/../..")
 	target_link_libraries(cdigidoc digidoc)
 endif()
 

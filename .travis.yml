@@ -1,5 +1,6 @@
 before_install: if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
     brew update;
+    brew install openssl;
   else
     sudo apt-get update -qq;
     sudo apt-get install -y cmake libxml2-dev libssl-dev;
@@ -7,7 +8,11 @@ before_install: if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
 script:
 - mkdir build
 - cd build
-- cmake ..
+- if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+    cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl ..;
+  else
+    cmake ..;
+  fi
 - make
 - cd ..
 
@@ -22,7 +27,6 @@ addons:
   coverity_scan:
     project:
       name: open-eid/libdigidoc
-      description: Build submitted via Travis CI
     notification_email: raul@metsma.ee
     build_command_prepend: mkdir coverity; cd coverity; cmake ..
     build_command: make

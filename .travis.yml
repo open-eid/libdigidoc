@@ -1,3 +1,7 @@
+os:
+- linux
+- osx
+dist: trusty
 before_install: if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
     brew update;
     brew install openssl;
@@ -15,10 +19,6 @@ script:
   fi
 - make
 - cd ..
-
-os:
-- linux
-- osx
 
 env:
   global:

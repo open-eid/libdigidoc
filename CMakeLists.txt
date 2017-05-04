@@ -1,5 +1,5 @@
-cmake_minimum_required( VERSION 2.8 )
-project( libdigidoc )
+cmake_minimum_required(VERSION 3.0)
+project(libdigidoc VERSION 3.10.3)
 
 set( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules" )
 set( INSTALL_DOC false CACHE BOOL "Install documentation" )

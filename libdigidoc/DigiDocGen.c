@@ -265,13 +265,13 @@ EXP_OPTION time_t convertStringToTimeT(const SignedDoc* pSigDoc, const char* szT
   }
   tm1.tm_year -= 1900;
   tm1.tm_mon -= 1;
-  tm1.tm_isdst = daylight;				
+  tm1.tm_isdst = _daylight;				
   t2 = mktime(&tm1);
   if(_daylight != 0) {
     if(_timezone < 0)
-      dmz = (_timezone / 3600) - daylight;
+      dmz = (_timezone / 3600) - _daylight;
     else
-      dmz = (_timezone / 3600) + daylight;
+      dmz = (_timezone / 3600) + _daylight;
   }
   else
     dmz = _timezone / 3600;

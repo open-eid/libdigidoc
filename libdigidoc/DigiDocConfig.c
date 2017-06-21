@@ -34,7 +34,9 @@
 //AA 04/01/26
 #ifdef WIN32
 #include <windows.h>
+#if defined(_MSC_VER) && _MSC_VER < 1900
 #define snprintf _snprintf
+#endif
 #elif defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
 #endif

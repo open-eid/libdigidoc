@@ -52,7 +52,9 @@
   #define FILESEPARATOR	"\\"
   #include <malloc.h>
   #include <direct.h> 
+  #if defined(_MSC_VER) && _MSC_VER < 1900
   #define snprintf _snprintf
+  #endif
 #else
   #define FILESEPARATOR	"/"
   #define DIGI_DOC_LIB

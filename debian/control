@@ -7,7 +7,7 @@ Build-Depends:
  cmake,
  libssl-dev,
  libxml2-dev
-Standards-Version: 3.9.5
+Standards-Version: 3.9.8
 Homepage: https://github.com/open-eid/libdigidoc
 
 Package: libdigidoc-common

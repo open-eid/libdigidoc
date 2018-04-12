@@ -40,7 +40,17 @@
 #include <ctype.h>
 #include <memory.h>
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new()
+{
+	return (EVP_ENCODE_CTX*)OPENSSL_malloc(sizeof(EVP_ENCODE_CTX));
+}
 
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+#endif
 
 //==========< general fucntions >============
 
@@ -836,16 +846,18 @@ int ddocConvertFileName(char* dest, int destlen, const char* src)
 //============================================================
 EXP_OPTION void encode(const byte* raw, int rawlen, byte* buf, int* buflen) 
 {
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
 
   RETURN_VOID_IF_NULL(raw);
   RETURN_VOID_IF_NULL(buf);
   RETURN_VOID_IF_NULL(buflen);
 	
   memset(buf, 0, *buflen);
-  EVP_EncodeInit(&ectx);
-  EVP_EncodeUpdate(&ectx, buf, buflen, (byte*)raw, rawlen);
-  EVP_EncodeFinal(&ectx, (unsigned char*)strchr((const char*)buf, 0), buflen); 
+  ectx = EVP_ENCODE_CTX_new();
+  EVP_EncodeInit(ectx);
+  EVP_EncodeUpdate(ectx, buf, buflen, (byte*)raw, rawlen);
+  EVP_EncodeFinal(ectx, (unsigned char*)strchr((const char*)buf, 0), buflen);
+  EVP_ENCODE_CTX_free(ectx);
   *buflen = strlen((const char*)buf);
   while(buf[*buflen-1] == '\n' || buf[*buflen-1] == '\r' || buf[*buflen-1] == '-') {
 	  if(buf[*buflen-1] == '-') 
@@ -887,7 +899,7 @@ byte* breakToLinesOf64(byte* raw, int rawlen)
 //============================================================
 EXP_OPTION void decode(const byte* raw, int rawlen, byte* buf, int* buflen) 
 {
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
   int l1 = 0;
   byte* p;
 
@@ -897,21 +909,23 @@ EXP_OPTION void decode(const byte* raw, int rawlen, byte* buf, int* buflen)
   
   memset(buf, 0, *buflen);
   *buflen = 0;
-  EVP_DecodeInit(&ectx);
+  ectx = EVP_ENCODE_CTX_new();
+  EVP_DecodeInit(ectx);
   if((!strstr((const char*)raw, "\n") ||
       !strstr((const char*)raw, "\r")) && 
      strlen((const char*)raw) > 64) {
     p = breakToLinesOf64((byte*)raw, rawlen);
     l1 = strlen((const char*)p);
-    EVP_DecodeUpdate(&ectx, (unsigned char*)buf, &l1, 
+	EVP_DecodeUpdate(ectx, (unsigned char*)buf, &l1,
 		     (unsigned char*)p, 
 		     strlen((const char*)p));
     *buflen += l1;
     free(p);
   }
   else
-    EVP_DecodeUpdate(&ectx, buf, buflen, (byte*)raw, rawlen);
-  EVP_DecodeFinal(&ectx, buf, &l1);
+	EVP_DecodeUpdate(ectx, buf, buflen, (byte*)raw, rawlen);
+  EVP_DecodeFinal(ectx, buf, &l1);
+  EVP_ENCODE_CTX_free(ectx);
   *buflen += l1;
 }
 
@@ -939,7 +953,7 @@ EXP_OPTION int ddocDecodeBase64(DigiDocMemBuf* pMBufSrc, DigiDocMemBuf* pMBufDes
 {
   int err = ERR_OK, n;
   long lPos1 = 0, lPos2 = 0;
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
   char buf1[70];
   RETURN_IF_NULL(pMBufSrc);
   RETURN_IF_NULL(pMBufDest);
@@ -949,7 +963,8 @@ EXP_OPTION int ddocDecodeBase64(DigiDocMemBuf* pMBufSrc, DigiDocMemBuf* pMBufDes
   // alloc mem for result - it will get smaller so original length must be enough
   err = ddocMemSetLength(pMBufDest, pMBufSrc->nLen);
   if(err) return err;
-  EVP_DecodeInit(&ectx);
+  ectx = EVP_ENCODE_CTX_new();
+  EVP_DecodeInit(ectx);
   // decode base64
   while(lPos1 < pMBufSrc->nLen) {
     // copy next input row
@@ -965,13 +980,14 @@ EXP_OPTION int ddocDecodeBase64(DigiDocMemBuf* pMBufSrc, DigiDocMemBuf* pMBufDes
     strncat(buf1, "\n", sizeof(buf1) - strlen(buf1));
     // decode this chunk
     n = pMBufDest->nLen - lPos2;
-    EVP_DecodeUpdate(&ectx, (unsigned char*)((char*)pMBufDest->pMem + lPos2), &n, 
+	EVP_DecodeUpdate(ectx, (unsigned char*)((char*)pMBufDest->pMem + lPos2), &n,
 		     (unsigned char*)buf1, strlen((const char*)buf1));
     lPos2 += n;
   }
   memset(buf1, 0, sizeof(buf1));
   n = sizeof(buf1);
-  EVP_DecodeFinal(&ectx, (unsigned char*)buf1, &n);
+  EVP_DecodeFinal(ectx, (unsigned char*)buf1, &n);
+  EVP_ENCODE_CTX_free(ectx);
   lPos2 += n;
   pMBufDest->nLen = lPos2;
   return err;
@@ -1005,7 +1021,7 @@ EXP_OPTION int ddocDecodeBase64Data(void* data, long len, DigiDocMemBuf* pMBufDe
 EXP_OPTION int ddocEncodeBase64(const DigiDocMemBuf* pMBufSrc, DigiDocMemBuf* pMBufDest) 
 {
   int err = ERR_OK, nLen;
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
 
   RETURN_IF_NULL(pMBufSrc);
   RETURN_IF_NULL(pMBufDest);
@@ -1015,14 +1031,16 @@ EXP_OPTION int ddocEncodeBase64(const DigiDocMemBuf* pMBufSrc, DigiDocMemBuf* pM
   // alloc mem for result
   err = ddocMemSetLength(pMBufDest, pMBufSrc->nLen * 2 + 10);
   if(err) return err;
-  EVP_EncodeInit(&ectx);
+  ectx = EVP_ENCODE_CTX_new();
+  EVP_EncodeInit(ectx);
   // encode base64
   nLen = pMBufDest->nLen;
-  EVP_EncodeUpdate(&ectx, (unsigned char*)pMBufDest->pMem, &nLen, 
+  EVP_EncodeUpdate(ectx, (unsigned char*)pMBufDest->pMem, &nLen,
 		   (byte*)pMBufSrc->pMem, pMBufSrc->nLen);
   pMBufDest->nLen = nLen;
   nLen = (pMBufSrc->nLen * 2 + 10) - pMBufDest->nLen;
-  EVP_EncodeFinal(&ectx, (unsigned char*)pMBufDest->pMem + pMBufDest->nLen, &nLen);
+  EVP_EncodeFinal(ectx, (unsigned char*)pMBufDest->pMem + pMBufDest->nLen, &nLen);
+  EVP_ENCODE_CTX_free(ectx);
   pMBufDest->nLen += nLen; //strlen((const char*)pMBufDest->pMem);
   return err;
 }

@@ -125,6 +125,21 @@
 #include <openssl/pkcs12.h>
 #include <openssl/rand.h>
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_MD_CTX *EVP_MD_CTX_new()
+{
+	return (EVP_MD_CTX*)OPENSSL_malloc(sizeof(EVP_MD_CTX));
+}
+
+static void EVP_MD_CTX_free(EVP_MD_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+#else
+# define BIO_R_BAD_HOSTNAME_LOOKUP                        102
+# define OCSP_R_SERVER_WRITE_ERROR                        116
+#endif
+
 long int tzone = -7200;	/* default for Estonia, but see initDigiDocLib() */
 int daylight = 0;		/* default, but see initDigiDocLib() */
 
@@ -474,7 +489,7 @@ EXP_OPTION int calculateFileSignature(const char* szFileName, int nDigestType,
 							const char *keyfile, const char* passwd)
 {
   int err = ERR_OK;
-  EVP_MD_CTX  ctx;
+  EVP_MD_CTX  *ctx;
   byte buf[FILE_BUFSIZE];
   int i;
   FILE *f = NULL;
@@ -491,13 +506,15 @@ EXP_OPTION int calculateFileSignature(const char* szFileName, int nDigestType,
     if(*nSigLen >= SIGNATURE_LEN) {
       if((err = ReadPrivateKey(&pkey, keyfile, passwd, FILE_FORMAT_PEM)) == ERR_OK) {
 	if((f = fopen(szFileName,"rb")) != NULL) {					
-	  EVP_SignInit(&ctx, EVP_sha1());
+	  ctx = EVP_MD_CTX_new();
+	  EVP_SignInit(ctx, EVP_sha1());
 	  for (;;) {
 	    i = fread(buf, sizeof(char), FILE_BUFSIZE, f);
 	    if (i <= 0) break;
-	    EVP_SignUpdate (&ctx, buf, (unsigned long)i);
+		EVP_SignUpdate (ctx, buf, (unsigned long)i);
 	  }
-	  err = EVP_SignFinal(&ctx, pSigBuf, (unsigned int*)nSigLen, pkey);
+	  err = EVP_SignFinal(ctx, pSigBuf, (unsigned int*)nSigLen, pkey);
+	  EVP_MD_CTX_free(ctx);
 	  if(err == ERR_LIB_NONE)
 	    err = ERR_OK;
 	  fclose(f);
@@ -535,7 +552,7 @@ EXP_OPTION int signData(const byte* data, int dlen, byte* pSigBuf, int* nSigLen,
 			 int nDigestType, const char *keyfile, const char* passwd)
 {
   int err = ERR_OK;
-  EVP_MD_CTX  ctx;
+  EVP_MD_CTX *ctx;
   EVP_PKEY* pkey;
 
   RETURN_IF_NULL_PARAM(data);
@@ -548,9 +565,11 @@ EXP_OPTION int signData(const byte* data, int dlen, byte* pSigBuf, int* nSigLen,
   if(nDigestType == DIGEST_SHA1) {
     if(*nSigLen >= SIGNATURE_LEN) {
       if((err = ReadPrivateKey(&pkey, keyfile, passwd, FILE_FORMAT_PEM)) == ERR_OK) {
-	EVP_SignInit(&ctx, EVP_sha1());
-	EVP_SignUpdate (&ctx, data, (unsigned long)dlen);
-	err = EVP_SignFinal(&ctx, pSigBuf, (unsigned int*)nSigLen, pkey);
+	ctx = EVP_MD_CTX_new();
+	EVP_SignInit(ctx, EVP_sha1());
+	EVP_SignUpdate (ctx, data, (unsigned long)dlen);
+	err = EVP_SignFinal(ctx, pSigBuf, (unsigned int*)nSigLen, pkey);
+	EVP_MD_CTX_free(ctx);
 	if(err == ERR_LIB_NONE)
 	  err = ERR_OK;
 	EVP_PKEY_free(pkey);				

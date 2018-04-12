@@ -1,47 +1,66 @@
-os:
-- linux
-- osx
+language: c++
+matrix:
+  include:
+  - os: linux
+    env: TARGET=ubuntu:16.04
+    sudo: false
+  - os: linux
+    env: TARGET=ubuntu:18.04
+    sudo: false
+  - os: linux
+    env: TARGET=i386/ubuntu:16.04
+    sudo: false
+  - os: osx
+    env: TARGET=osx
+sudo: required
 dist: trusty
+osx_image: xcode9.2
+services:
+- docker
+cache: ccache
+env:
+  global:
+  - BUILD_NUMBER=${TRAVIS_BUILD_NUMBER}
 before_install: if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
     brew update;
     brew install openssl;
-  else
-    sudo apt-get update -qq;
-    sudo apt-get install -y cmake libxml2-dev libssl-dev;
   fi
-script:
-- mkdir build
-- cd build
-- if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
-    cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl ..;
-  else
-    cmake ..;
-  fi
-- make
-- cd ..
-
-env:
-  global:
-  - secure: AhDg868E2SgZbGhsFyDQd19IVCZcQ2a7shdojRTxIxF10TGhAleFEtm4EAoXjjgCPcGY52o1aVaEMea/GRnLR6oLQ592igxNHjTlTGKcDp5w28xVq9m7d4JVrvUeYvKoi+szS4Ah8zhraGdssMaq8LtZzLbaoEXCaMCDRlXPGro=
-addons:
-  coverity_scan:
-    project:
-      name: open-eid/libdigidoc
-    notification_email: raul@metsma.ee
-    build_command_prepend: mkdir coverity; cd coverity; cmake ..
-    build_command: make
-    branch_pattern: coverity_scan
+script: case ${TARGET} in
+  *osx*)
+    mkdir build && cd build && cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl ..;
+    make all pkgbuild;
+    cd ..;
+    ;;
+  *)
+    docker run -e BUILD_NUMBER=${BUILD_NUMBER} -e COVERITY_SCAN_TOKEN=${COVERITY_SCAN_TOKEN} -e TRAVIS_BRANCH=${TRAVIS_BRANCH} -e TARGET=${TARGET} -v $(pwd):$(pwd) -t "${TARGET}" /bin/bash -c "cd $(pwd);"'
+      apt-get update -qq;
+      apt-get install -y dh-make devscripts dpkg-dev cdbs cmake libxml2-dev libssl-dev git curl wget ruby;
+      export VERSION=$(grep project CMakeLists.txt | egrep -o "([0-9]{1,}\.)+[0-9]{1,}").${BUILD_NUMBER};
+      export DEBFULLNAME="Travis";
+      export DEBEMAIL="travis-ci@travis";
+      dh_make --createorig --addmissing --defaultless -y -p libdigidoc_${VERSION};
+      dch --distribution $(lsb_release -cs) -v ${VERSION} "Release ${VERSION}.";
+      dpkg-buildpackage -rfakeroot -us -uc;
+      if [ "${TARGET}" = "ubuntu:16.04" ]; then
+        export COVERITY_SCAN_PROJECT_NAME="open-eid/libdigidoc";
+        export COVERITY_SCAN_NOTIFICATION_EMAIL="raul@metsma.ee";
+        export COVERITY_SCAN_BRANCH_PATTERN=coverity_scan;
+        export COVERITY_SCAN_BUILD_COMMAND_PREPEND="mkdir coverity && cd coverity && cmake ..";
+        export COVERITY_SCAN_BUILD_COMMAND=make;
+        wget -O - https://scan.coverity.com/scripts/travisci_build_coverity_scan.sh | bash;
+      fi;
+      git clean -dxf';
+    ;;
+  esac
 
 before_deploy:
 - export VERSION=${TRAVIS_TAG:1}
-- rm -rf build
 - cd ..
 - mv libdigidoc libdigidoc-${VERSION}
 - tar czf libdigidoc-${VERSION}.tar.gz --exclude-vcs libdigidoc-${VERSION}
 deploy:
   provider: releases
-  api_key:
-    secure: GwHhMH2ha01kUpsB4M4xvqKQPhKkJucESHYzR+ga8gegm4Td74QQ+WMNZ16IZQwTl4DTa2OqlLPm0JryWnLRjJeifweV4PJFcByMv/lZt589T09saZ742C9jzZk5J7u+4m+g8lgjESofxLDV24AcGFGuAXuT+qTIeAIXBw32WHw=
+  api_key: ${GITHUB_ACCESS_TOKEN}
   file: libdigidoc-${VERSION}.tar.gz
   skip_cleanup: true
   on:

@@ -1,15 +1,15 @@
 cmake_minimum_required(VERSION 3.0)
-project(libdigidoc VERSION 3.10.3)
+project(libdigidoc VERSION 3.10.4)
 
 set( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules" )
-set( INSTALL_DOC false CACHE BOOL "Install documentation" )
-set( BUILD_TOOLS true CACHE BOOL "Build digidoc-tool" )
-set( BUILD_TYPE "SHARED" CACHE STRING "Build library as SHARED/STATIC" )
+set( BUILD_TOOLS YES CACHE BOOL "Build digidoc-tool" )
+set( BUILD_TYPE SHARED CACHE STRING "Build library as SHARED/STATIC" )
+set( SIGNCERT "" CACHE STRING "Common name of certificate to used sign binaries, empty skip signing" )
+set( INSTCERT "" CACHE STRING "Common name of certificate to used sign packages, empty skip signing" )
 if( APPLE )
 	set( FRAMEWORK YES CACHE BOOL "Build library as Mac OS X Framework" )
 endif()
 
-include( CheckIncludeFiles )
 include( VersionInfo )
 include( GNUInstallDirs )
 
@@ -26,17 +26,15 @@ find_package( PKCS11 )
 find_package( ZLIB REQUIRED )
 find_package( Iconv )
 
-if( INSTALL_DOC )
-	if( DOXYGEN_FOUND )
-		configure_file( ${CMAKE_SOURCE_DIR}/etc/Doxyfile.in Doxyfile @ONLY )
-		add_custom_target( docs ALL
-			${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-			COMMENT "Generating API documentation with Doxygen" VERBATIM
-		)
-		install( DIRECTORY ${CMAKE_BINARY_DIR}/doc/ DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/libdigidoc )
-	endif()
-	install( DIRECTORY doc/ DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/libdigidoc PATTERN ".svn" EXCLUDE )
+if( DOXYGEN_FOUND )
+	configure_file( ${CMAKE_SOURCE_DIR}/etc/Doxyfile.in Doxyfile @ONLY )
+	add_custom_target( docs ALL
+		${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+		COMMENT "Generating API documentation with Doxygen" VERBATIM
+	)
+	install( DIRECTORY ${CMAKE_BINARY_DIR}/doc/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/libdigidoc )
+	install( DIRECTORY doc/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/libdigidoc )
 endif()
 
 configure_file( config.h.cmake config.h )
@@ -53,4 +51,3 @@ if( ICONV_FOUND )
 endif()
 
 add_subdirectory( libdigidoc )
-

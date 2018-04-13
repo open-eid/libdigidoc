@@ -25,14 +25,14 @@ BEGIN
 	BEGIN
 		BLOCK "040904E4"
 		BEGIN
-			VALUE "CompanyName", "Estonian ID Card\0"
-			VALUE "FileDescription", "cdigidoc\0"
-			VALUE "FileVersion", VERSION "\0"
-            VALUE "InternalName", "cdigidoc\0"
-			VALUE "LegalCopyright", "Copyright (C) 2009-2012 Estonian ID Card"
-            VALUE "OriginalFilename", "cdigidoc.exe\0"
-			VALUE "ProductName", "cdigidoc\0"
-			VALUE "ProductVersion", VERSION "\0"
+			VALUE "CompanyName", "RIA"
+			VALUE "FileDescription", "cdigidoc"
+			VALUE "FileVersion", VERSION
+			VALUE "InternalName", "cdigidoc"
+			VALUE "LegalCopyright", "Copyright (C) 2009-2018 Estonian Information System Authority"
+			VALUE "OriginalFilename", "cdigidoc.exe"
+			VALUE "ProductName", "cdigidoc"
+			VALUE "ProductVersion", VERSION
 		END
 	END
 	BLOCK "VarFileInfo"

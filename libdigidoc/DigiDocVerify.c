@@ -47,6 +47,28 @@
 #include <openssl/pkcs12.h>
 #include <openssl/rand.h>
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_MD_CTX *EVP_MD_CTX_new()
+{
+	return (EVP_MD_CTX*)OPENSSL_malloc(sizeof(EVP_MD_CTX));
+}
+
+static void EVP_MD_CTX_free(EVP_MD_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+
+static const ASN1_OCTET_STRING *OCSP_resp_get0_signature(const OCSP_BASICRESP *bs)
+{
+	return bs->signature;
+}
+
+static X509_VERIFY_PARAM *X509_STORE_get0_param(X509_STORE *ctx)
+{
+	return ctx->param;
+}
+#endif
+
 //--------------------< ddoc structure def >-----------------------
 
 const XmlElemDef eTransform = {"Transform", 'Y', NULL}; /* 1.0 */
@@ -393,7 +415,7 @@ EXP_OPTION int verifyFileSignature(const char* szFileName, int nDigestType,
 						const char *certfile)
 {
   int err = ERR_OK;
-  EVP_MD_CTX  ctx;
+  EVP_MD_CTX *ctx;
   unsigned char buf[FILE_BUFSIZE];
   int i;
   FILE *f;
@@ -406,13 +428,15 @@ EXP_OPTION int verifyFileSignature(const char* szFileName, int nDigestType,
   if(nDigestType == DIGEST_SHA1) {
     if((err = ReadPublicKey(&pkey, certfile)) == ERR_OK) {
       if((f = fopen(szFileName,"rb")) != NULL) {
-	EVP_VerifyInit(&ctx, EVP_sha1());
+	ctx = EVP_MD_CTX_new();
+	EVP_VerifyInit(ctx, EVP_sha1());
 	for (;;) {
 	  i = fread(buf, sizeof(char), FILE_BUFSIZE, f);
 	  if (i <= 0) break;
-	  EVP_VerifyUpdate (&ctx, buf, (unsigned long)i);
+	  EVP_VerifyUpdate (ctx, buf, (unsigned long)i);
 	}
-	err = EVP_VerifyFinal(&ctx, pSigBuf, nSigLen, pkey);
+	err = EVP_VerifyFinal(ctx, pSigBuf, nSigLen, pkey);
+	EVP_MD_CTX_free(ctx);
 	if(err == ERR_LIB_NONE)
 	  err = ERR_OK;
 	fclose(f);
@@ -447,7 +471,7 @@ EXP_OPTION int verifySignature(const char* szData, unsigned long dataLen, int nD
 					byte* pSigBuf, int nSigLen, X509* cert)
 {
   int err = ERR_OK;
-  EVP_MD_CTX  ctx;
+  EVP_MD_CTX *ctx;
   EVP_PKEY* pkey = NULL;
   
   RETURN_IF_NULL_PARAM(szData);
@@ -457,11 +481,13 @@ EXP_OPTION int verifySignature(const char* szData, unsigned long dataLen, int nD
   if(nDigestType == DIGEST_SHA1) {
     if((err = GetPublicKey(&pkey, cert)) == ERR_OK) {
       checkErrors();
-      EVP_VerifyInit(&ctx, EVP_sha1());
+	  ctx = EVP_MD_CTX_new();
+	  EVP_VerifyInit(ctx, EVP_sha1());
       checkErrors();
-      EVP_VerifyUpdate (&ctx, szData, dataLen);
+	  EVP_VerifyUpdate (ctx, szData, dataLen);
       checkErrors();
-      err = EVP_VerifyFinal(&ctx, pSigBuf, nSigLen, pkey);
+	  err = EVP_VerifyFinal(ctx, pSigBuf, nSigLen, pkey);
+	  EVP_MD_CTX_free(ctx);
       if(err == ERR_LIB_NONE)
 	err = ERR_OK;
       checkErrors();
@@ -536,6 +562,7 @@ EXP_OPTION int verifyEstIDSignature(const byte* digest, int digestLen, int nDige
 {
   int err = ERR_OK, nCheckSigValAsn1 = 1;
   EVP_PKEY* pkey = 0;
+  RSA *rsa = 0;
   byte buf2[DIGEST_LEN+2], buf3[500], buf4[200], buf5[200],buf256[DIGEST_LEN256+2];
   int l2 = 0, l1;
   //AM 11.02.09 ecdsa-sha1 support for LI
@@ -578,9 +605,11 @@ EXP_OPTION int verifyEstIDSignature(const byte* digest, int digestLen, int nDige
 		  }
 	  }else 
 #endif
-		if(pkey->type==NID_rsaEncryption){
+		if(EVP_PKEY_base_id(pkey)==EVP_PKEY_RSA){
 		  //clearErrors();
-		  l2 = RSA_public_decrypt(nSigLen, pSigBuf, buf3, pkey->pkey.rsa, RSA_PKCS1_PADDING); //RSA_PKCS1_PADDING); //RSA_NO_PADDING);
+		  rsa = EVP_PKEY_get1_RSA(pkey);
+		  l2 = RSA_public_decrypt(nSigLen, pSigBuf, buf3, rsa, RSA_PKCS1_PADDING); //RSA_PKCS1_PADDING); //RSA_NO_PADDING);
+		  RSA_free(rsa);
 		  checkErrors();
 		  ddocDebug(3, "verifyEstIDSignature", "decryted sig-hash len: %d", l2);
 		  // debug info
@@ -628,7 +657,9 @@ EXP_OPTION int verifyEstIDSignature(const byte* digest, int digestLen, int nDige
       memset(buf3, 0, sizeof(buf3));
       ERR_clear_error();
       //swapBytes(pSigBuf, nSigLen);
-      l2 = RSA_public_decrypt(nSigLen, pSigBuf, buf3, pkey->pkey.rsa, RSA_PKCS1_PADDING); //RSA_PKCS1_PADDING); //RSA_NO_PADDING);
+	  rsa = EVP_PKEY_get1_RSA(pkey);
+	  l2 = RSA_public_decrypt(nSigLen, pSigBuf, buf3, rsa, RSA_PKCS1_PADDING); //RSA_PKCS1_PADDING); //RSA_NO_PADDING);
+	  RSA_free(rsa);
       checkErrors();
 	  ddocDebug(3, "verifyEstIDSignature", "decryted sig-hash len: %d", l2);
 	  // debug info
@@ -1163,10 +1194,11 @@ X509_ALGOR* setSignAlgorithm(const EVP_MD * type)
 	/*if ((nid = EVP_MD_type(type)) != NID_undef) {
 		alg->algorithm=OBJ_nid2obj(nid);
 	}*/
-	alg->algorithm = OBJ_nid2obj(type->pkey_type);
+	alg->algorithm = OBJ_nid2obj(EVP_MD_pkey_type(type));
 	return alg;
 }
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
 //--------------------------------------------------
 // Helper function. Converts Notary info to an OCSP
 // response structure. Used in verify and file writing
@@ -1268,6 +1300,7 @@ int notary2ocspBasResp(const SignedDoc* pSigDoc, const NotaryInfo* pNotInfo, X50
   //	checkErrors();
   return ERR_OK;
 }
+#endif
 
 //--------------------------------------------------
 // Verfies NotaryInfo signature
@@ -1375,20 +1408,18 @@ int verifyOcspCertId(OCSP_RESPONSE* pResp, X509* pCert, X509* pCaCert)
   OCSP_CERTID *cid = NULL;
   int err = ERR_OK;
   DigiDocMemBuf mbuf1, mbuf2, mbuf3;
+  ASN1_OCTET_STRING *issuerNameHash = NULL, *issuerKeyHash = NULL;
+  ASN1_INTEGER *serialNumber = NULL;
     
   RETURN_IF_NULL_PARAM(pResp);
   RETURN_IF_NULL_PARAM(pCert);
   RETURN_IF_NULL_PARAM(pCaCert);
-  RETURN_IF_NULL_PARAM(pResp->responseBytes);
   mbuf1.pMem = 0;
   mbuf1.nLen = 0;
   mbuf2.pMem = 0;
   mbuf2.nLen = 0;    
   mbuf3.pMem = 0;
   mbuf3.nLen = 0;    
-  rb = pResp->responseBytes;
-  if(OBJ_obj2nid(rb->responseType) != NID_id_pkix_OCSP_basic)
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_UNKNOWN_TYPE);
   if((br = OCSP_response_get1_basic(pResp)) == NULL)
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_BASIC_RESP);
  ddocCertGetSubjectDN(pCert, &mbuf2);
@@ -1396,28 +1427,22 @@ int verifyOcspCertId(OCSP_RESPONSE* pResp, X509* pCert, X509* pCaCert)
   ddocDebug(4, "verifyOcspCertId", "for cert: %ld, cn: %s, ca: %s", X509_get_serialNumber(pCert), mbuf2.pMem, mbuf3.pMem);
   ddocMemBuf_free(&mbuf2);
   ddocMemBuf_free(&mbuf3);
-  rd = br->tbsResponseData;
-  if(ASN1_INTEGER_get(rd->version) != 0)
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_WRONG_VERSION);
-  if(sk_OCSP_SINGLERESP_num(rd->responses) != 1)
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_ONE_RESPONSE);
-  single = sk_OCSP_SINGLERESP_value(rd->responses, 0);
-  RETURN_IF_NULL(single);
-  cid = single->certId;
+  cid = OCSP_cert_to_id(EVP_sha1(), pCert, pCaCert);
   RETURN_IF_NULL(cid);
+  OCSP_id_get0_info(&issuerNameHash, NULL, &issuerKeyHash, &serialNumber, cid);
   // check serial number
-  if(ASN1_INTEGER_cmp(cid->serialNumber, X509_get_serialNumber(pCert)) != 0) {
+  if(ASN1_INTEGER_cmp(serialNumber, X509_get_serialNumber(pCert)) != 0) {
     ddocDebug(4, "verifyOcspCertId", "Looking for cert-nr: %ld buf found %ld", 
-        X509_get_serialNumber(pCert), ASN1_INTEGER_get(cid->serialNumber));
+		X509_get_serialNumber(pCert), ASN1_INTEGER_get(serialNumber));
     return ERR_WRONG_CERT;
   }
   // check issuer name hash
   err = ddocCertGetIssuerNameDigest(pCert, &mbuf1);
   RETURN_IF_NOT(err == ERR_OK, err);
   err = compareByteArrays((byte*)mbuf1.pMem, (unsigned int)mbuf1.nLen, 
-        cid->issuerNameHash->data, cid->issuerNameHash->length);
-  mbuf2.pMem = cid->issuerNameHash->data;
-  mbuf2.nLen = cid->issuerNameHash->length;
+		issuerNameHash->data, issuerNameHash->length);
+  mbuf2.pMem = issuerNameHash->data;
+  mbuf2.nLen = issuerNameHash->length;
   ddocBin2Hex(&mbuf2, &mbuf3);
   mbuf2.pMem = 0;
   mbuf2.nLen = 0;    
@@ -1432,9 +1457,9 @@ int verifyOcspCertId(OCSP_RESPONSE* pResp, X509* pCert, X509* pCaCert)
   err = ddocCertGetPubkeyDigest(pCaCert, &mbuf1);
   RETURN_IF_NOT(err == ERR_OK, err);
   err = compareByteArrays((byte*)mbuf1.pMem, (unsigned int)mbuf1.nLen, 
-                          cid->issuerKeyHash->data, cid->issuerKeyHash->length);
-  mbuf2.pMem = cid->issuerKeyHash->data;
-  mbuf2.nLen = cid->issuerKeyHash->length;
+						  issuerKeyHash->data, issuerKeyHash->length);
+  mbuf2.pMem = issuerKeyHash->data;
+  mbuf2.nLen = issuerKeyHash->length;
   ddocBin2Hex(&mbuf2, &mbuf3);
   mbuf2.pMem = 0;
   mbuf2.nLen = 0;    
@@ -1482,6 +1507,7 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
   X509_STORE *store;
   OCSP_RESPONSE* pResp = NULL;
   OCSP_BASICRESP* bs = NULL;
+  ASN1_OCTET_STRING *signature = NULL;
   STACK_OF(X509)* ver_certs = NULL;
   int err = ERR_OK, l1;
   X509 *certNotaryDirectCA = 0, *pCert = 0, *pCaCert = 0;
@@ -1516,7 +1542,7 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
   //WriteOCSPResponse("test2.resp", pResp);
   if((setup_verifyCERT(&store, CApath, caCerts)) == ERR_OK) {
     ddocNotInfo_GetProducedAt_timet(pNotInfo, &tProdAt);
-    X509_VERIFY_PARAM_set_time(store->param, tProdAt);
+	X509_VERIFY_PARAM_set_time(X509_STORE_get0_param(store), tProdAt);
     X509_STORE_set_flags(store, X509_V_FLAG_USE_CHECK_TIME);
     // new basic response
     // create OCSP basic response
@@ -1531,10 +1557,11 @@ EXP_OPTION int verifyNotaryInfoCERT2(const SignedDoc* pSigDoc,
           sk_X509_push(ver_certs, notCert);
           ddocDebug(3, "verifyNotaryInfoCERT", "OCSP verify err: %d, err1: %d format: %s", err, pSigInfo->nErr1, pSigDoc->szFormatVer);
           // fix invalid padding flag on ddoc 1.0 signatures
+		  signature = (ASN1_OCTET_STRING*)OCSP_resp_get0_signature(bs);
           if((!strcmp(pSigDoc->szFormatVer, SK_XML_1_VER) && !strcmp(pSigDoc->szFormat, SK_XML_1_NAME))
-             || (bs->signature->flags & 0x07)) {
-              ddocDebug(3, "verifyNotaryInfoCERT", "Reset ocsp flag %d", bs->signature->flags);
-              bs->signature->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT|0x07);
+			 || (signature->flags & 0x07)) {
+			  ddocDebug(3, "verifyNotaryInfoCERT", "Reset ocsp flag %d", signature->flags);
+			  signature->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT|0x07);
           }
           err = OCSP_basic_verify(bs, ver_certs, store, OCSP_NOCHECKS);
           ddocDebug(3, "verifyNotaryInfoCERT", "OCSP verify: %d, not cet: %s cn: %s", err, buf1, mbuf1.pMem);

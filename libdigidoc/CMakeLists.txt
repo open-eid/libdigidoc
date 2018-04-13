@@ -31,18 +31,15 @@ set( PUBLIC_HEADER
 )
 
 if( WIN32 )
-	add_definitions( -DWITH_SOAPDEFS_H )
+	add_definitions(
+		-DWITH_SOAPDEFS_H
+		-D_CRT_NONSTDC_NO_DEPRECATE
+		-D_CRT_SECURE_NO_DEPRECATE
+		-D_CRT_SECURE_NO_WARNINGS
+		-D_SCL_SECURE_NO_WARNINGS
+	)
 	list( APPEND libdigidoc_SRCS DigiDocGlobals.c DigiDocCSP.c DigiCrypt.c DlgUnit.c DlgUnitS.c )
 	set( EXT_LIBRARIES Crypt32 Comctl32 )
-endif()
-
-if( MSVC )
-    add_definitions(
-        -D_CRT_NONSTDC_NO_DEPRECATE
-        -D_CRT_SECURE_NO_DEPRECATE
-        -D_CRT_SECURE_NO_WARNINGS
-        -D_SCL_SECURE_NO_WARNINGS
-    )
 endif()
 
 add_library( digidoc ${BUILD_TYPE}
@@ -75,11 +72,11 @@ add_library( digidoc ${BUILD_TYPE}
 )
 
 target_link_libraries( digidoc
-    ${CMAKE_DL_LIBS}
-    ${LIBXML2_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
-    ${ZLIB_LIBRARIES}
-    ${EXT_LIBRARIES}
+	${CMAKE_DL_LIBS}
+	${LIBXML2_LIBRARIES}
+	${OPENSSL_LIBRARIES}
+	${ZLIB_LIBRARIES}
+	${EXT_LIBRARIES}
 )
 
 set_target_properties( digidoc PROPERTIES
@@ -108,7 +105,7 @@ install( TARGETS digidoc
 )
 
 if(WIN32)
-	install( DIRECTORY ${PROJECT_BINARY_DIR}/libdigidoc/ DESTINATION ${CMAKE_INSTALL_LIBDIR} FILES_MATCHING PATTERN "*.pdb" )
+	install(FILES $<TARGET_PDB_FILE:digidoc> $<TARGET_PDB_FILE:cdigidoc> DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
 endif()
 
 if( FRAMEWORK )
@@ -121,14 +118,17 @@ if( FRAMEWORK )
 	add_custom_command( TARGET cdigidoc POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cdigidoc> $<TARGET_FILE_DIR:digidoc>/Resources )
 	add_custom_target( codesign DEPENDS cdigidoc
-		COMMAND codesign -f -s \"$$SIGNCERT\" $<TARGET_FILE_DIR:digidoc>/Resources/cdigidoc
-		COMMAND codesign -f -s \"$$SIGNCERT\" $<TARGET_FILE_DIR:digidoc>/../..
+		COMMAND codesign -f -s ${SIGNCERT}
+			$<TARGET_FILE_DIR:digidoc>/Resources/cdigidoc
+			$<TARGET_FILE_DIR:digidoc>/../..
 		COMMAND touch $<TARGET_FILE:cdigidoc>
 	)
-	add_custom_target( pkgbuild DEPENDS codesign
-		COMMAND make install DESTDIR=install \; pkgbuild
-			--root install
-			--sign \"$$INSTCERT\"
+	if(INSTCERT)
+		set(PKGEXTRA --sign ${INSTCERT})
+	endif()
+	add_custom_target( pkgbuild DEPENDS cdigidoc
+		COMMAND make install DESTDIR=install
+		COMMAND pkgbuild --root install ${PKGEXTRA}
 			${CMAKE_BINARY_DIR}/libdigidoc_${VERSION}$ENV{VER_SUFFIX}.pkg
 	)
 	add_custom_target( zipdebug DEPENDS cdigidoc

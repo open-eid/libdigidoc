@@ -47,6 +47,25 @@
 
 #include <fcntl.h>
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new()
+{
+	return (EVP_ENCODE_CTX*)OPENSSL_malloc(sizeof(EVP_ENCODE_CTX));
+}
+
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+
+static void RSA_get0_key(const RSA *r, const BIGNUM **n, const BIGNUM **e, const BIGNUM **d)
+{
+	if (n) *n = r->n;
+	if (e) *e = r->e;
+	if (d) *d = r->d;
+}
+#endif
+
 //-----------< helper functions >----------------------------
 
 
@@ -1088,6 +1107,8 @@ int addSignatureInfoXML(DigiDocMemBuf *pMBufXML, SignedDoc* pSigDoc, SignatureIn
   unsigned char buf2[500], *buf1 = 0;
   int len2, len1;
   EVP_PKEY* pubKey = NULL;
+  const RSA *rsa = NULL;
+  const BIGNUM *n = NULL, *e = NULL;
   SignatureValue *pSigVal;
   DigiDocMemBuf mbuf1;
 
@@ -1127,9 +1148,11 @@ int addSignatureInfoXML(DigiDocMemBuf *pMBufXML, SignedDoc* pSigDoc, SignatureIn
     // FIXME
     // modulus
 	//AM 11.02.09 
-	if(!err && pubKey->type==NID_rsaEncryption) {
+	if(!err && EVP_PKEY_base_id(pubKey)==EVP_PKEY_RSA) {
 		ddocMemAppendData(pMBufXML,"<KeyValue>\n<RSAKeyValue>\n", -1);
-		len1 = BN_bn2bin(pubKey->pkey.rsa->n, buf1);
+		rsa = EVP_PKEY_get1_RSA(pubKey);
+		RSA_get0_key(rsa, &n, &e, NULL);
+		len1 = BN_bn2bin(n, buf1);
     // in version 1.1 we output modulus as it is
     // starting from 1.2 we convert it to big-endian
     /*len2 = sizeof(buf2);
@@ -1148,7 +1171,7 @@ int addSignatureInfoXML(DigiDocMemBuf *pMBufXML, SignedDoc* pSigDoc, SignatureIn
 		ddocMemAppendData(pMBufXML,"</Modulus>\n", -1);
 		// exponent
 		memset(buf1, 0, len1);
-		len1 = BN_bn2bin(pubKey->pkey.rsa->e, buf1);
+		len1 = BN_bn2bin(e, buf1);
 		len2 = sizeof(buf2);
 		memset(buf2, 0, len2);
 		encode(buf1, len1, buf2, &len2);
@@ -1156,7 +1179,8 @@ int addSignatureInfoXML(DigiDocMemBuf *pMBufXML, SignedDoc* pSigDoc, SignatureIn
 		ddocMemAppendData(pMBufXML, (char*)buf2, -1);
 		ddocMemAppendData(pMBufXML,"</Exponent>\n", -1);
 		ddocMemAppendData(pMBufXML,"</RSAKeyValue>\n</KeyValue>\n", -1);
-    }
+		RSA_free(rsa);
+	}
     // cert data
     ddocMemAppendData(pMBufXML,"<X509Data><X509Certificate>\n", -1);
   }
@@ -1237,7 +1261,7 @@ EXP_OPTION int generateDataFileXML(SignedDoc* pSigDoc, DataFile* pDataFile,
   char buf1[2050], buf2[5000], fixedFileName[1024], *p = 0;
   char *name, *value, *fName;
   FILE *fIn = 0;
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
   SHA_CTX sctx;
   DigiDocMemBuf mbuf1, mbuf2, mbuf3;
 #ifdef WIN32
@@ -1385,7 +1409,10 @@ EXP_OPTION int generateDataFileXML(SignedDoc* pSigDoc, DataFile* pDataFile,
 #endif
       ddocDebug(4, "generateDataFileXML", "Opened FILE01: %s", szDataFile);
 	  if(!strcmp(pSigDoc->szFormat, SK_XML_1_NAME))
-		  EVP_DecodeInit(&ectx);
+	  {
+		  ectx = EVP_ENCODE_CTX_new();
+		  EVP_DecodeInit(ectx);
+	  }
       while((len1 = fread(buf1, 1, sizeof(buf1)-2, fIn)) > 0) {
 #ifdef WITH_BASE64_HASHING_HACK
 	if(!strcmp(pDataFile->szContentType, CONTENT_EMBEDDED_BASE64)) {
@@ -1407,7 +1434,7 @@ EXP_OPTION int generateDataFileXML(SignedDoc* pSigDoc, DataFile* pDataFile,
 		  while(*p == ' ' || *p == '\n' || *p == '\r') p++;
 		  ddocDebug(4, "generateDataFileXML", "decode: %s", p);
 		  len2 = sizeof(buf2);
-		  EVP_DecodeUpdate(&ectx, (unsigned char*)buf2, &len2, (unsigned char*)p, strlen(p));
+		  EVP_DecodeUpdate(ectx, (unsigned char*)buf2, &len2, (unsigned char*)p, strlen(p));
 		  ddocDebug(4, "generateDataFileXML", "sha1 update orig: %d: dec: %d", len1, len2);
 		  SHA1_Update(&sctx, (const char*)buf2, len2);
 		  //ddocDebugWriteFile(4, "df-data0.txt", &mbuf3);
@@ -1427,7 +1454,8 @@ EXP_OPTION int generateDataFileXML(SignedDoc* pSigDoc, DataFile* pDataFile,
       fIn = 0;
 	  if(!strcmp(pSigDoc->szFormat, SK_XML_1_NAME)) {
 		len2 = sizeof(buf2);
-		EVP_DecodeFinal(&ectx, (unsigned char*)buf2, &len2);
+		EVP_DecodeFinal(ectx, (unsigned char*)buf2, &len2);
+		EVP_ENCODE_CTX_free(ectx);
 		SHA1_Update(&sctx, (const char*)buf2, len2);
 		ddocDebug(4, "generateDataFileXML", "sha1 final dec: %d", len1, len2);
 		len2 = sizeof(buf2);
@@ -1455,10 +1483,11 @@ EXP_OPTION int generateDataFileXML(SignedDoc* pSigDoc, DataFile* pDataFile,
           ddocDebug(4, "generateDataFileXML", "Opened FILE2: %s", fixedFileName);
 	// if encoded
 	if(!strcmp(pDataFile->szContentType, CONTENT_EMBEDDED_BASE64)) {
-	  EVP_EncodeInit(&ectx);
+	  ectx = EVP_ENCODE_CTX_new();
+	  EVP_EncodeInit(ectx);
 	  while((len1 = fread(buf1, 1, sizeof(buf1), fIn)) > 0) {
 	    len2 = sizeof(buf2);
-	    EVP_EncodeUpdate(&ectx, (unsigned char*)buf2, &len2, (unsigned char*)buf1, len1);
+		EVP_EncodeUpdate(ectx, (unsigned char*)buf2, &len2, (unsigned char*)buf1, len1);
 	    buf2[len2] = 0;
 #ifdef WITH_BASE64_HASHING_HACK
 		ddocCanonicalizePCDATA(buf2);
@@ -1474,7 +1503,8 @@ EXP_OPTION int generateDataFileXML(SignedDoc* pSigDoc, DataFile* pDataFile,
 		if(hFile)
 			fwrite(buf2, sizeof(char), len2, hFile);
 	  }
-	  EVP_EncodeFinal(&ectx, (unsigned char*)buf2, &len2);
+	  EVP_EncodeFinal(ectx, (unsigned char*)buf2, &len2);
+	  EVP_ENCODE_CTX_free(ectx);
 	  buf2[len2] = 0;
 #ifdef WITH_BASE64_HASHING_HACK
 	  ddocCanonicalizePCDATA(buf2);

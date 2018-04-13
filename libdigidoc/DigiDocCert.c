@@ -1107,16 +1107,17 @@ EXP_OPTION int readCertExtData(X509* pCert, DigiDocMemBuf* pMemBuf, int nExt, in
   pos = X509_get_ext_by_NID(pCert, nExt, -1);
   if(pos >= 0) {
 	pExt = X509_get_ext(pCert, pos);
-	if(pExt && pExt->value && pExt->value->data) {
+	ASN1_OCTET_STRING *value = X509_EXTENSION_get_data(pExt);
+	if(pExt && value && value->data) {
       /*    memset(buf1, 0, sizeof(buf1));
           l1 = sizeof(buf1);
 	  bin2hex(pExt->value->data, pExt->value->length, buf1, &l1);
           ddocDebug(3, "readCertExtData", "Ext: %d len: %d data: %s", nExt, pExt->value->length, buf1);*/
-		if(pExt->value->length > 20 && nOff)
+		if(value->length > 20 && nOff)
 			//ddocMemAssignData(pMemBuf, ((char*)pExt->value->data) + (pExt->value->length - 20), 20);
-			ddocMemAssignData(pMemBuf, ((char*)pExt->value->data) + nOff, 20);
+			ddocMemAssignData(pMemBuf, ((char*)value->data) + nOff, 20);
 		else
-			ddocMemAssignData(pMemBuf, ((char*)pExt->value->data), pExt->value->length);
+			ddocMemAssignData(pMemBuf, ((char*)value->data), value->length);
 	}
   }
   return err;
@@ -1277,6 +1278,7 @@ int ddocCertGetDN(X509* pCert, DigiDocMemBuf* pMemBuf, int bIssuer)
   int err = ERR_OK;
   X509_NAME *pName = 0;
   X509_NAME_ENTRY *pNe = 0;
+  ASN1_STRING *data = 0;
   int i, n, l, t, b = 0;
   const char *s;
   unsigned char* p;
@@ -1296,11 +1298,12 @@ int ddocCertGetDN(X509* pCert, DigiDocMemBuf* pMemBuf, int bIssuer)
   else
     pName = X509_get_subject_name(pCert);
   RETURN_IF_NULL(pName)
-  for(i = 0; (err == ERR_OK) && (i < sk_X509_NAME_ENTRY_num(pName->entries)); i++) {
-    pNe = sk_X509_NAME_ENTRY_value(pName->entries, i);
-    n = OBJ_obj2nid(pNe->object);
+  for(i = 0; (err == ERR_OK) && (i < X509_NAME_entry_count(pName)); i++) {
+	pNe = X509_NAME_get_entry(pName, i);
+	n = OBJ_obj2nid(X509_NAME_ENTRY_get_object(pNe));
     s = OBJ_nid2sn(n);
-    t = pNe->value->type;
+	data = X509_NAME_ENTRY_get_data(pNe);
+	t = data->type;
     // mostly we find here:
     // V_ASN1_PRINTABLESTRING, V_ASN1_TELETEXSTRING or V_ASN1_BMPSTRING
     // that we convert to UTF, but V_ASN1_UTF8STRING allready is in UTF8
@@ -1309,10 +1312,10 @@ int ddocCertGetDN(X509* pCert, DigiDocMemBuf* pMemBuf, int bIssuer)
       // convert to UTF8 only
       p = 0;
       if(t == V_ASN1_UTF8STRING) {
-	p = pNe->value->data;
-	l = pNe->value->length;
+		p = data->data;
+		l = data->length;
       } else
-	l = ASN1_STRING_to_UTF8(&p, pNe->value);
+		l = ASN1_STRING_to_UTF8(&p, data);
       ddocDebug(5, "ddocCertGetDN", 
 		"NameEntry nid: %d type: %d len: %d item: %s value: \'%s\'", 
 		n, t, l, s, (p ? (const char*)p : "NULL"));
@@ -1371,6 +1374,7 @@ EXP_OPTION int ddocCertGetDNFromName(X509_NAME* pName, DigiDocMemBuf* pMemBuf)
 {
   int err = ERR_OK;
   X509_NAME_ENTRY *pNe = 0;
+  ASN1_STRING *data = 0;
   int i, n, l, t, b = 0;
   const char *s;
   unsigned char* p;
@@ -1383,11 +1387,12 @@ EXP_OPTION int ddocCertGetDNFromName(X509_NAME* pName, DigiDocMemBuf* pMemBuf)
   pMemBuf->pMem = 0;
   pMemBuf->nLen = 0;
 
-  for(i = 0; (err == ERR_OK) && (i < sk_X509_NAME_ENTRY_num(pName->entries)); i++) {
-    pNe = sk_X509_NAME_ENTRY_value(pName->entries, i);
-    n = OBJ_obj2nid(pNe->object);
+  for(i = 0; (err == ERR_OK) && (i < X509_NAME_entry_count(pName)); i++) {
+	pNe = X509_NAME_get_entry(pName, i);
+	n = OBJ_obj2nid(X509_NAME_ENTRY_get_object(pNe));
     s = OBJ_nid2sn(n);
-    t = pNe->value->type;
+	data = X509_NAME_ENTRY_get_data(pNe);
+	t = data->type;
     // mostly we find here:
     // V_ASN1_PRINTABLESTRING, V_ASN1_TELETEXSTRING or V_ASN1_BMPSTRING
     // that we convert to UTF, but V_ASN1_UTF8STRING allready is in UTF8
@@ -1396,10 +1401,10 @@ EXP_OPTION int ddocCertGetDNFromName(X509_NAME* pName, DigiDocMemBuf* pMemBuf)
       // convert to UTF8 only
       p = 0;
       if(t == V_ASN1_UTF8STRING) {
-	p = pNe->value->data;
-	l = pNe->value->length;
+		p = data->data;
+		l = data->length;
       } else
-	l = ASN1_STRING_to_UTF8(&p, pNe->value);
+		l = ASN1_STRING_to_UTF8(&p, data);
       ddocDebug(5, "ddocCertGetDN", 
 		"NameEntry nid: %d type: %d len: %d item: %s value: \'%s\'", 
 		n, t, l, s, (p ? (const char*)p : "NULL"));
@@ -1437,6 +1442,7 @@ int ddocCertGetDNPart(X509* pCert, DigiDocMemBuf* pMemBuf, int nNid, int bIssuer
   int err = ERR_OK;
   X509_NAME *pName = 0;
   X509_NAME_ENTRY *pNe = 0;
+  ASN1_STRING *data;
   int i, n, l, t, m, j;
   const char *s;
   unsigned char* p = 0;
@@ -1455,11 +1461,12 @@ int ddocCertGetDNPart(X509* pCert, DigiDocMemBuf* pMemBuf, int nNid, int bIssuer
     pName = X509_get_issuer_name(pCert);
   else
     pName = X509_get_subject_name(pCert);
-  for(i = 0; (err == ERR_OK) && (i < sk_X509_NAME_ENTRY_num(pName->entries)); i++) {
-    pNe = sk_X509_NAME_ENTRY_value(pName->entries, i);
-    n = OBJ_obj2nid(pNe->object);
+  for(i = 0; (err == ERR_OK) && (i < X509_NAME_entry_count(pName)); i++) {
+	pNe = X509_NAME_get_entry(pName, i);
+	n = OBJ_obj2nid(X509_NAME_ENTRY_get_object(pNe));
     s = OBJ_nid2sn(n);
-    t = pNe->value->type;
+	data = X509_NAME_ENTRY_get_data(pNe);
+	t = data->type;
     // mostly we find here:
     // V_ASN1_PRINTABLESTRING, V_ASN1_TELETEXSTRING or V_ASN1_BMPSTRING
     // that we convert to UTF, but V_ASN1_UTF8STRING allready is in UTF8
@@ -1467,10 +1474,10 @@ int ddocCertGetDNPart(X509* pCert, DigiDocMemBuf* pMemBuf, int nNid, int bIssuer
     if(n == nNid && s != NULL) {
       // convert to UTF8 only
       if(t == V_ASN1_UTF8STRING) {
-	p = pNe->value->data;
-	l = pNe->value->length;
+		p = data->data;
+		l = data->length;
       } else
-	l = ASN1_STRING_to_UTF8(&p, pNe->value);
+		l = ASN1_STRING_to_UTF8(&p, data);
 	// test for 0x0
         m = (p ? strlen(p) : 0);
 	if(m < l && p) {
@@ -1650,6 +1657,7 @@ int bdocCertGetDN(X509* pCert, DigiDocMemBuf* pMemBuf, int bIssuer)
   int err = ERR_OK;
   X509_NAME *pName = 0;
   X509_NAME_ENTRY *pNe = 0;
+  ASN1_STRING *data = NULL;
   int i, n, l, t, b = 0;
   const char *s;
   unsigned char* p;
@@ -1668,11 +1676,12 @@ int bdocCertGetDN(X509* pCert, DigiDocMemBuf* pMemBuf, int bIssuer)
     pName = X509_get_issuer_name(pCert);
   else
     pName = X509_get_subject_name(pCert);
-  for(i = 0; (err == ERR_OK) && (i < sk_X509_NAME_ENTRY_num(pName->entries)); i++) {
-    pNe = sk_X509_NAME_ENTRY_value(pName->entries, i);
-    n = OBJ_obj2nid(pNe->object);
+  for(i = 0; (err == ERR_OK) && (i < X509_NAME_entry_count(pName)); i++) {
+	pNe = X509_NAME_get_entry(pName, i);
+	data = X509_NAME_ENTRY_get_data(pNe);
+	n = OBJ_obj2nid(X509_NAME_ENTRY_get_object(pNe));
     s = OBJ_nid2sn(n);
-    t = pNe->value->type;
+	t = data->type;
     // mostly we find here:
     // V_ASN1_PRINTABLESTRING, V_ASN1_TELETEXSTRING or V_ASN1_BMPSTRING
     // that we convert to UTF, but V_ASN1_UTF8STRING allready is in UTF8
@@ -1681,10 +1690,10 @@ int bdocCertGetDN(X509* pCert, DigiDocMemBuf* pMemBuf, int bIssuer)
       // convert to UTF8 only
       p = 0;
       if(t == V_ASN1_UTF8STRING) {
-	p = pNe->value->data;
-	l = pNe->value->length;
+		p = data->data;
+		l = data->length;
       } else
-	l = ASN1_STRING_to_UTF8(&p, pNe->value);
+		l = ASN1_STRING_to_UTF8(&p, data);
       ddocDebug(5, "ddocCertGetDN", 
 		"NameEntry nid: %d type: %d len: %d item: %s value: \'%s\'", 
 		n, t, l, s, (p ? (const char*)p : "NULL"));

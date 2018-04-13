@@ -59,6 +59,58 @@ static int password_callback(char *buf, int bufsiz, int verify, void *cb_data)
 }
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static int OCSP_resp_get0_id(const OCSP_BASICRESP *bs, const ASN1_OCTET_STRING **pid, const X509_NAME **pname)
+{
+	*pid = NULL;
+	*pname = NULL;
+	const OCSP_RESPID *rid = bs->tbsResponseData->responderId;
+	if (rid->type == V_OCSP_RESPID_NAME)
+		*pname = rid->value.byName;
+	else if (rid->type == V_OCSP_RESPID_KEY)
+		*pid = rid->value.byKey;
+	else
+		return 0;
+	return 1;
+}
+
+static const ASN1_GENERALIZEDTIME *OCSP_resp_get0_produced_at(const OCSP_BASICRESP* bs)
+{
+	return bs->tbsResponseData->producedAt;
+}
+
+static const OCSP_CERTID *OCSP_SINGLERESP_get0_id(const OCSP_SINGLERESP *single)
+{
+	return single->certId;
+}
+
+static const ASN1_OCTET_STRING *OCSP_resp_get0_signature(const OCSP_BASICRESP *bs)
+{
+	return bs->signature;
+}
+
+static const STACK_OF(X509_EXTENSION) *X509_get0_extensions(const X509 *x)
+{
+	return x->cert_info->extensions;
+}
+
+static const ASN1_TIME *X509_get0_notBefore(const X509 *x)
+{
+	return x->cert_info->validity->notBefore;
+}
+
+static const ASN1_TIME *X509_get0_notAfter(const X509 *x)
+{
+	return x->cert_info->validity->notAfter;
+}
+#else
+# define BIO_R_BAD_HOSTNAME_LOOKUP                        102
+# define OCSP_R_NO_CONTENT                                106
+# define OCSP_F_OCSP_SENDREQ_BIO                          112
+# define OCSP_R_SERVER_READ_ERROR                         113
+# define OCSP_R_SERVER_WRITE_ERROR                        116
+#endif
+
 //================< OCSP functions> =================================
 
 static int ddocOcspProxyAuthInfo(char *authinfo, const char *user, const char *pass)
@@ -309,20 +361,21 @@ int calcNotaryDigest(SignedDoc* pSigDoc, NotaryInfo* pNotary)
 int initializeNotaryInfoWithOCSP(SignedDoc *pSigDoc, NotaryInfo *pNotary, 
 				OCSP_RESPONSE *resp, X509 *notCert, int initDigest)
 {
-  int n, err = ERR_OK;
+  int n, err = ERR_OK, status = 0;
   char buf[500];
   OCSP_RESPBYTES *rb = NULL;
   OCSP_BASICRESP *br = NULL;
-  OCSP_RESPDATA  *rd = NULL;
-  OCSP_RESPID *rid = NULL;
-  // OCSP_CERTSTATUS *cst = NULL;
   OCSP_SINGLERESP *single = NULL;
-  OCSP_CERTID *cid = NULL;
+  const OCSP_CERTID *cid = NULL;
   X509_EXTENSION *nonce;
+  const ASN1_GENERALIZEDTIME *producedAt = NULL;
   //AM 26.09.08
   DigiDocMemBuf mbuf1;
   mbuf1.pMem = 0;
   mbuf1.nLen = 0;
+  const ASN1_OCTET_STRING *id = NULL;
+  const X509_NAME *name = NULL;
+  ASN1_OBJECT *hashAlgorithm = NULL;
 
 	
   RETURN_IF_NULL_PARAM(pNotary);
@@ -348,69 +401,66 @@ int initializeNotaryInfoWithOCSP(SignedDoc *pSigDoc, NotaryInfo *pNotary,
   default:
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_UNSUCCESSFUL);
   }
-  RETURN_IF_NULL_PARAM(resp->responseBytes);
-  rb = resp->responseBytes;
-  if(OBJ_obj2nid(rb->responseType) != NID_id_pkix_OCSP_basic) 
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_UNKNOWN_TYPE);
   if((br = OCSP_response_get1_basic(resp)) == NULL) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_BASIC_RESP);
   ddocDebug(4, "initializeNotaryInfoWithOCSP", "test2");
-  rd = br->tbsResponseData;
-  if(ASN1_INTEGER_get(rd->version) != 0) 
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_WRONG_VERSION);
-  n = sk_OCSP_SINGLERESP_num(rd->responses);
+  n = OCSP_resp_count(br);
   if(n != 1) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_ONE_RESPONSE);
-  single = sk_OCSP_SINGLERESP_value(rd->responses, 0);
+  single = OCSP_resp_get0(br, 0);
   RETURN_IF_NULL(single);
-  cid = single->certId;
+  cid = OCSP_SINGLERESP_get0_id(single);
   RETURN_IF_NULL(cid);
-  ddocDebug(4, "initializeNotaryInfoWithOCSP", "CertStatus-type: %d", single->certStatus->type);
+  status = OCSP_single_get0_status(single, NULL, NULL, NULL, NULL);
+  ddocDebug(4, "initializeNotaryInfoWithOCSP", "CertStatus-type: %d", status);
   //printf("TYPE: %d\n", single->certStatus->type);
-  if(single->certStatus->type != 0) {
-    ddocDebug(4, "initializeNotaryInfoWithOCSP", "errcode: %d", handleOCSPCertStatus(single->certStatus->type));
-    SET_LAST_ERROR_RETURN_CODE(handleOCSPCertStatus(single->certStatus->type));
+  if(status != 0) {
+	ddocDebug(4, "initializeNotaryInfoWithOCSP", "errcode: %d", handleOCSPCertStatus(status));
+	SET_LAST_ERROR_RETURN_CODE(handleOCSPCertStatus(status));
   }
   //Removed 31.10.2003
   //if(single->singleExtensions) 
   //	SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_SINGLE_EXT);
-  if(!rd->responseExtensions ||
-     (sk_X509_EXTENSION_num(rd->responseExtensions) != 1) ||
-     ((nonce = sk_X509_EXTENSION_value(rd->responseExtensions, 0)) == NULL)) 
+  if((OCSP_BASICRESP_get_ext_count(br) != 1) ||
+	 ((nonce = OCSP_BASICRESP_get_ext(br, 0)) == NULL))
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_NONCE);
-  i2t_ASN1_OBJECT(buf,sizeof(buf),nonce->object);
+  i2t_ASN1_OBJECT(buf,sizeof(buf), X509_EXTENSION_get_object(nonce));
   if(strcmp(buf, OCSP_NONCE_NAME)) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_NONCE);
-  rid =  rd->responderId;
-  if(rid->type == V_OCSP_RESPID_NAME) {
+  OCSP_resp_get0_id(br, &id, &name);
+  if(name) {
     pNotary->nRespIdType = RESPID_NAME_TYPE;
-  } else if(rid->type == V_OCSP_RESPID_KEY) {
+  } else if(id) {
     pNotary->nRespIdType = RESPID_KEY_TYPE;
   } else {
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_WRONG_RESPID);
   }
   // producedAt
-  err = asn1time2str(pSigDoc, rd->producedAt, buf, sizeof(buf));
+  producedAt = OCSP_resp_get0_produced_at(br);
+  err = asn1time2str(pSigDoc, (ASN1_GENERALIZEDTIME*)producedAt, buf, sizeof(buf));
   setString(&(pNotary->timeProduced), buf, -1);
   n = sizeof(buf);
-  if(rid->type == V_OCSP_RESPID_NAME){
+  if(name){
     //X509_NAME_oneline(rid->value.byName,buf,n);
-    err = ddocCertGetDNFromName(rid->value.byName, &mbuf1);
+	err = ddocCertGetDNFromName((X509_NAME*)name, &mbuf1);
     err = ddocNotInfo_SetResponderId(pNotary, (char*)mbuf1.pMem, -1);
     ddocMemBuf_free(&mbuf1);
   }
-  if(rid->type == V_OCSP_RESPID_KEY) {
-    err = ddocNotInfo_SetResponderId(pNotary, (const char*)rid->value.byKey->data, rid->value.byKey->length);
+  if(id) {
+	err = ddocNotInfo_SetResponderId(pNotary, (const char*)id->data, id->length);
   }
+  OCSP_id_get0_info(NULL, &hashAlgorithm, NULL, NULL, (OCSP_CERTID*)cid);
   // digest type
-  i2t_ASN1_OBJECT(buf,sizeof(buf),cid->hashAlgorithm->algorithm);
+  i2t_ASN1_OBJECT(buf,sizeof(buf),hashAlgorithm);
   //AM 24.11.09 why its needed? added if. 08.12.09 used for gen
   if(!pNotary->szDigestType){
 	  setString(&(pNotary->szDigestType), buf, -1);
   }
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
   // signature algorithm
   i2t_ASN1_OBJECT(buf,sizeof(buf),br->signatureAlgorithm->algorithm);
   setString(&(pNotary->szSigType), buf, -1);
+#endif
   // notary cert
   if(notCert && !err)
     err = addNotaryInfoCert(pSigDoc, pNotary, notCert);
@@ -427,20 +477,22 @@ int initializeNotaryInfoWithOCSP(SignedDoc *pSigDoc, NotaryInfo *pNotary,
 int initializeNotaryInfoWithOCSP2(SignedDoc *pSigDoc, NotaryInfo *pNotary, 
 				OCSP_RESPONSE *resp, X509 *notCert, int initDigest)
 {
-  int n, err = ERR_OK;
+  int n, err = ERR_OK, status = 0;
   char buf[500];
   OCSP_RESPBYTES *rb = NULL;
   OCSP_BASICRESP *br = NULL;
-  OCSP_RESPDATA  *rd = NULL;
-  OCSP_RESPID *rid = NULL;
   // OCSP_CERTSTATUS *cst = NULL;
   OCSP_SINGLERESP *single = NULL;
-  OCSP_CERTID *cid = NULL;
+  const OCSP_CERTID *cid = NULL;
   X509_EXTENSION *nonce;
+  const ASN1_GENERALIZEDTIME *producedAt = NULL;
   //AM 26.09.08
   DigiDocMemBuf mbuf1;
   mbuf1.pMem = 0;
   mbuf1.nLen = 0;
+  const ASN1_OCTET_STRING *id = NULL;
+  const X509_NAME *name = NULL;
+  ASN1_OBJECT *hashAlgorithm = NULL;
 
 	
   RETURN_IF_NULL_PARAM(pNotary);
@@ -462,23 +514,17 @@ int initializeNotaryInfoWithOCSP2(SignedDoc *pSigDoc, NotaryInfo *pNotary,
   default:
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_UNSUCCESSFUL);
   }
-  RETURN_IF_NULL_PARAM(resp->responseBytes);;
-  rb = resp->responseBytes;
-  if(OBJ_obj2nid(rb->responseType) != NID_id_pkix_OCSP_basic) 
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_UNKNOWN_TYPE);
   if((br = OCSP_response_get1_basic(resp)) == NULL) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_BASIC_RESP);
-  rd = br->tbsResponseData;
-  if(ASN1_INTEGER_get(rd->version) != 0) 
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_WRONG_VERSION);
-  n = sk_OCSP_SINGLERESP_num(rd->responses);
+  n = OCSP_resp_count(br);
   if(n != 1) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_ONE_RESPONSE);
-  single = sk_OCSP_SINGLERESP_value(rd->responses, 0);
+  single = OCSP_resp_get0(br, 0);
   RETURN_IF_NULL(single);
-  cid = single->certId;
+  cid = OCSP_SINGLERESP_get0_id(single);
   RETURN_IF_NULL(cid);
-  ddocDebug(4, "initializeNotaryInfoWithOCSP", "CertStatus-type: %d", single->certStatus->type);
+  status = OCSP_single_get0_status(single, NULL, NULL, NULL, NULL);
+  ddocDebug(4, "initializeNotaryInfoWithOCSP", "CertStatus-type: %d", status);
   //printf("TYPE: %d\n", single->certStatus->type);
   //Am test
   /*if(single->certStatus->type != 0) {
@@ -488,40 +534,43 @@ int initializeNotaryInfoWithOCSP2(SignedDoc *pSigDoc, NotaryInfo *pNotary,
   //Removed 31.10.2003
   //if(single->singleExtensions) 
   //	SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_SINGLE_EXT);
-  if(!rd->responseExtensions ||
-     (sk_X509_EXTENSION_num(rd->responseExtensions) != 1) ||
-     ((nonce = sk_X509_EXTENSION_value(rd->responseExtensions, 0)) == NULL)) 
+  if((OCSP_BASICRESP_get_ext_count(br) != 1) ||
+	 ((nonce = OCSP_BASICRESP_get_ext(br, 0)) == NULL))
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_NONCE);
-  i2t_ASN1_OBJECT(buf,sizeof(buf),nonce->object);
+  i2t_ASN1_OBJECT(buf,sizeof(buf),X509_EXTENSION_get_object(nonce));
   if(strcmp(buf, OCSP_NONCE_NAME)) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_NONCE);
-  rid =  rd->responderId;
-  if(rid->type == V_OCSP_RESPID_NAME) {
+  OCSP_resp_get0_id(br, &id, &name);
+  if(name) {
     pNotary->nRespIdType = RESPID_NAME_TYPE;
-  } else if(rid->type == V_OCSP_RESPID_KEY) {
+  } else if(id) {
     pNotary->nRespIdType = RESPID_KEY_TYPE;
   } else {
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_WRONG_RESPID);
   }
   // producedAt
-  err = asn1time2str(pSigDoc, rd->producedAt, buf, sizeof(buf));
+  producedAt = OCSP_resp_get0_produced_at(br);
+  err = asn1time2str(pSigDoc, (ASN1_GENERALIZEDTIME*)producedAt, buf, sizeof(buf));
   setString(&(pNotary->timeProduced), buf, -1);
   n = sizeof(buf);
-  if(rid->type == V_OCSP_RESPID_NAME){
-	err = ddocCertGetDNFromName(rid->value.byName, &mbuf1);
+  if(name){
+	err = ddocCertGetDNFromName((X509_NAME*)name, &mbuf1);
 	RETURN_IF_NOT(err == ERR_OK, err);
 	err = ddocNotInfo_SetResponderId(pNotary, (char*)mbuf1.pMem, -1);
 	ddocMemBuf_free(&mbuf1);
   }
-  if(rid->type == V_OCSP_RESPID_KEY) {
-    err = ddocNotInfo_SetResponderId(pNotary, (const char*)rid->value.byKey->data, rid->value.byKey->length);
+  if(id) {
+	err = ddocNotInfo_SetResponderId(pNotary, (const char*)id->data, id->length);
   }
+  OCSP_id_get0_info(NULL, &hashAlgorithm, NULL, NULL, (OCSP_CERTID*)cid);
   // digest type
-  i2t_ASN1_OBJECT(buf,sizeof(buf),cid->hashAlgorithm->algorithm);
+  i2t_ASN1_OBJECT(buf,sizeof(buf),hashAlgorithm);
   setString(&(pNotary->szDigestType), buf, -1);
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
   // signature algorithm
   i2t_ASN1_OBJECT(buf,sizeof(buf),br->signatureAlgorithm->algorithm);
   setString(&(pNotary->szSigType), buf, -1);
+#endif
   // notary cert
   if(notCert && !err)
     err = addNotaryInfoCert(pSigDoc, pNotary, notCert);
@@ -716,6 +765,7 @@ unsigned char *get_authority_key(STACK_OF(X509_EXTENSION) *exts)
   int i, found=0;
   X509_EXTENSION *ex=0;
   ASN1_OBJECT *obj;
+  ASN1_OCTET_STRING *data = NULL;
   X509V3_EXT_METHOD *met;
   void *st = NULL;
   unsigned char *p;
@@ -738,10 +788,11 @@ unsigned char *get_authority_key(STACK_OF(X509_EXTENSION) *exts)
   }
   
   met = (X509V3_EXT_METHOD*)X509V3_EXT_get(ex);
-  p = ex->value->data;
+  data = X509_EXTENSION_get_data(ex);
+  p = data->data;
 #if OPENSSL_VERSION_NUMBER > 0x00908000
   // crashes here!
-  st = ASN1_item_d2i(NULL, (const unsigned char**)&p, ex->value->length, ASN1_ITEM_ptr(met->it));
+  st = ASN1_item_d2i(NULL, (const unsigned char**)&p, data->length, ASN1_ITEM_ptr(met->it));
 #else
   st = ASN1_item_d2i(NULL, &p, ex->value->length, ASN1_ITEM_ptr(met->it));
 #endif
@@ -799,19 +850,12 @@ OCSP_CERTID* createOCSPCertid(X509 *cert, X509* pCACert)
 {
   OCSP_CERTID *pId = NULL;
   X509_NAME *iname;
-  unsigned char *ikey = NULL;
   ASN1_INTEGER *sno;
-  const EVP_MD *dgst;
-  X509_ALGOR *alg;
-  unsigned char md[EVP_MAX_MD_SIZE], buf1[100];
-  unsigned int len;
-  int l1;
   DigiDocMemBuf mbuf1, mbuf2;
+  AUTHORITY_KEYID *val = NULL;
 
   mbuf1.pMem = mbuf2.pMem = NULL;
   mbuf1.nLen = mbuf2.nLen = 0;
-  l1 = (int)sizeof(buf1);
-  memset(buf1, 0, l1);
   if(cert != NULL) {
 	  ddocCertGetSubjectDN(cert, &mbuf1);
     // standard variant would be
@@ -824,48 +868,19 @@ OCSP_CERTID* createOCSPCertid(X509 *cert, X509* pCACert)
 	  } else { // CA unknown
 		  ddocDebug(3, "createOCSPCertid", "Create ocsp id for cert: %s unknown CA", (char*)mbuf1.pMem);
 		// issuer name hashi arvutamine 
-		iname = X509_get_issuer_name(cert);
-		dgst = EVP_sha1();
-		len = sizeof(md);
-		if(X509_NAME_digest(iname, dgst, md, &len)) {
-		// issuer key hashi lugemine
-		//ikey = get_authority_key(cert->cert_info->extensions);
-		ikey = get_authority_key_from_cert(cert);
-		if(ikey != NULL) {
-		// serial numbri lugemine
+		val = (AUTHORITY_KEYID*)X509_get_ext_d2i(cert, NID_authority_key_identifier, NULL, NULL );
+		if(!val) {
+		  ddocDebug(4, "get_authority_key_from_cert", "Extension not found");
+		  return(NULL);
+		}
 		sno = X509_get_serialNumber(cert);
-		// OCSP certid koostamine
-		if((pId = OCSP_CERTID_new()) != NULL) {
-		// replace default algorithm ???
-		alg = pId->hashAlgorithm;
-		if(alg->algorithm != NULL)
-			ASN1_OBJECT_free(alg->algorithm);
-		alg->algorithm = OBJ_nid2obj(EVP_MD_type(dgst));
-		if((alg->parameter = ASN1_TYPE_new()) != NULL) {
-			alg->parameter->type = V_ASN1_NULL;
-			ASN1_INTEGER_free(pId->serialNumber);
-			pId->serialNumber = ASN1_INTEGER_dup(sno);
-			if(!ASN1_OCTET_STRING_set(pId->issuerNameHash, md, len) ||
-				!ASN1_OCTET_STRING_set(pId->issuerKeyHash, ikey, strlen((const char*)ikey)) ||
-			!pId->serialNumber) 
-			{
-				fprintf(stderr, "Unable to fill in CID\n");
-				OCSP_CERTID_free(pId);
-				pId = NULL;
-			}
-		} // else - failed to create algorithm					
-		}
-		// cleanup ikey
-		free(ikey);
-		}
-		} // else - SHA1 failed	
+		iname = X509_get_issuer_name(cert);
+		pId = OCSP_cert_id_new(EVP_sha1(), iname, val->keyid, sno);
 	  }
   }
   ddocMemBuf_free(&mbuf1);
   ddocMemBuf_free(&mbuf2);
-  if(pId)
-	bin2hex((const byte*)pId->issuerKeyHash->data, pId->issuerKeyHash->length, (byte*)buf1, &l1);
-  ddocDebug(3, "createOCSPCertid", "Created ocsp id %s issuer-key-hash: %s", (pId ? "OK" : "ERR"), buf1);
+  ddocDebug(3, "createOCSPCertid", "Created ocsp id %s issuer-key-hash", (pId ? "OK" : "ERR"));
   return pId;
 }
 
@@ -1310,8 +1325,8 @@ EXP_OPTION int signOCSPRequestPKCS12(OCSP_REQUEST *req, const char* filename, co
   time(&tNow);
   err = isCertValid(x509, tNow);
 #else
-  if( X509_cmp_current_time(x509->cert_info->validity->notBefore) >= 0 &&
-      X509_cmp_current_time(x509->cert_info->validity->notAfter) <= 0)
+  if( X509_cmp_current_time(X509_get0_notBefore(x509)) >= 0 &&
+	  X509_cmp_current_time(X509_get0_notAfter(x509)) <= 0)
     err = ERR_CERT_INVALID;
 #endif
   if (err != ERR_OK)
@@ -1575,8 +1590,6 @@ int verifyOCSPResponse(OCSP_RESPONSE* pResp,
   int err = ERR_OK;
   
   RETURN_IF_NULL_PARAM(pResp);
-  RETURN_IF_NOT(ASN1_ENUMERATED_get(pResp->responseStatus) == 0, ERR_OCSP_UNSUCCESSFUL);
-  RETURN_IF_NOT(OBJ_obj2nid(pResp->responseBytes->responseType) == NID_id_pkix_OCSP_basic, ERR_OCSP_UNKNOWN_TYPE);
   RETURN_IF_NOT(caCerts != NULL, ERR_OCSP_RESP_NOT_TRUSTED);
   RETURN_IF_NOT(notCert != NULL, ERR_OCSP_CERT_NOTFOUND);
   RETURN_IF_NOT((bs = OCSP_response_get1_basic(pResp)) != NULL, ERR_OCSP_NO_BASIC_RESP);
@@ -1607,61 +1620,61 @@ int verifyOCSPResponse(OCSP_RESPONSE* pResp,
 
 int checkNonceAndCertbyOCSP(OCSP_RESPONSE* resp, X509* cert, byte* nonce1, int nonceLen)
 {
-  int err = ERR_OK, n;
+  int err = ERR_OK, n, status = 0;
   char buf[100];
   OCSP_BASICRESP *br = NULL;
-  OCSP_RESPDATA  *rd = NULL;
   OCSP_SINGLERESP *single = NULL;
-  OCSP_CERTID *cid = NULL;
+  const OCSP_CERTID *cid = NULL;
   X509_EXTENSION *nonce;
   X509_NAME *iname;
   unsigned char *ikey;
+  ASN1_INTEGER *serialNumber = NULL;
+  ASN1_OCTET_STRING *issuerNameHash = NULL, *issuerKeyHash = NULL, *nonceValue = NULL;
 	
   RETURN_IF_NULL_PARAM(resp);
   RETURN_IF_NULL_PARAM(cert);
   if((br = OCSP_response_get1_basic(resp)) == NULL) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_BASIC_RESP);
-  rd = br->tbsResponseData;
-  n = sk_OCSP_SINGLERESP_num(rd->responses);
+  n = OCSP_resp_count(br);
   RETURN_IF_NOT(n == 1, ERR_OCSP_ONE_RESPONSE);
-  single = sk_OCSP_SINGLERESP_value(rd->responses, 0);
+  single = OCSP_resp_get0(br, 0);
   RETURN_IF_NOT(single, ERR_OCSP_ONE_RESPONSE);
-  cid = single->certId;
+  cid = OCSP_SINGLERESP_get0_id(single);
   RETURN_IF_NULL(cid);
-  err = handleOCSPCertStatus(single->certStatus->type);
+  status = OCSP_single_get0_status(single, NULL, NULL, NULL, NULL);
+  err = handleOCSPCertStatus(status);
   if(err)
     SET_LAST_ERROR_RETURN_CODE(err);
-  if(single->singleExtensions) 
-    SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_SINGLE_EXT);
-  if(!rd->responseExtensions ||
-     (sk_X509_EXTENSION_num(rd->responseExtensions) != 1) ||
-     ((nonce = sk_X509_EXTENSION_value(rd->responseExtensions, 0)) == NULL)) 
+  if((OCSP_BASICRESP_get_ext_count(br) != 1) ||
+	 ((nonce = OCSP_BASICRESP_get_ext(br, 0)) == NULL))
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_NONCE);
-  i2t_ASN1_OBJECT(buf, sizeof(buf), nonce->object);
+  i2t_ASN1_OBJECT(buf, sizeof(buf), X509_EXTENSION_get_object(nonce));
   if(strcmp(buf, OCSP_NONCE_NAME)) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_NONCE);
   // check serial number
-  if(ASN1_INTEGER_cmp(X509_get_serialNumber(cert), cid->serialNumber) != 0)
+  OCSP_id_get0_info(&issuerNameHash, NULL, &issuerKeyHash, &serialNumber, (OCSP_CERTID*)cid);
+  if(ASN1_INTEGER_cmp(X509_get_serialNumber(cert), serialNumber) != 0)
     SET_LAST_ERROR_RETURN_CODE(ERR_WRONG_CERT);
   // check issuer name hash
   iname = X509_get_issuer_name(cert);
   n = sizeof(buf);
   X509_NAME_digest(iname, EVP_sha1(), (byte*)buf, (unsigned int*)&n);
-  err = compareByteArrays((byte*)buf, (unsigned int)n, cid->issuerNameHash->data, cid->issuerNameHash->length);
+  err = compareByteArrays((byte*)buf, (unsigned int)n, issuerNameHash->data, issuerNameHash->length);
   RETURN_IF_NOT(err == ERR_OK, err);
   // check issuer key hash
-  if((ikey = get_authority_key(cert->cert_info->extensions)) != NULL) {
+  if((ikey = get_authority_key(X509_get0_extensions(cert))) != NULL) {
     err = compareByteArrays(ikey, strlen((const char*)ikey), 
-			    cid->issuerKeyHash->data, cid->issuerKeyHash->length);
+				issuerKeyHash->data, issuerKeyHash->length);
     // cleanup ikey
     free(ikey);
   } 
   // verify nonce value
-  if(nonce->value->length == DIGEST_LEN)
-    err = compareByteArrays(nonce->value->data, nonce->value->length, nonce1, nonceLen);
+  nonceValue = X509_EXTENSION_get_data(nonce);
+  if(nonceValue->length == DIGEST_LEN)
+	err = compareByteArrays(nonceValue->data, nonceValue->length, nonce1, nonceLen);
   else
-    err = compareByteArrays(nonce->value->data + 2, nonce->value->length - 2, nonce1, nonceLen);
-  ddocDebug(3, "checkNonceAndCertbyOCSP", "nonce1-len: %d nonce2-len: %d err: %d", nonce->value->length, nonceLen, err);
+	err = compareByteArrays(nonceValue->data + 2, nonceValue->length - 2, nonce1, nonceLen);
+  ddocDebug(3, "checkNonceAndCertbyOCSP", "nonce1-len: %d nonce2-len: %d err: %d", nonceValue->length, nonceLen, err);
   if (err != ERR_OK) SET_LAST_ERROR(err);
   if(br)
     OCSP_BASICRESP_free(br);

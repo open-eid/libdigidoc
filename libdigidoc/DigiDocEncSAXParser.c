@@ -51,6 +51,18 @@
 #include <libxml/parser.h>
 #include <libxml/parserInternals.h> /* only for xmlNewInputFromFile() */
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new()
+{
+	return (EVP_ENCODE_CTX*)OPENSSL_malloc(sizeof(EVP_ENCODE_CTX));
+}
+
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+#endif
+
 //===============< SAX handlers >==============================
 
 /*
@@ -235,18 +247,20 @@ int dencSaxHandleEndCipherValue(DEncParse* pctx)
 {
   int err = ERR_OK, l = 0, i;
   char *p = 0;
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
 
   if(pctx->mbufContent.pMem && pctx->mbufContent.nLen) {
     l = pctx->mbufContent.nLen; // enough since it's shrinking
     p = (char*)malloc(l);
     RETURN_IF_BAD_ALLOC(p)
     //decode((const byte*)pctx->mbufContent.pMem, pctx->mbufContent.nLen, p, &l);
-    EVP_DecodeInit(&ectx);
-    EVP_DecodeUpdate(&ectx, (unsigned char*)p, &l, (unsigned char*)pctx->mbufContent.pMem, pctx->mbufContent.nLen);
+	ectx = EVP_ENCODE_CTX_new();
+	EVP_DecodeInit(ectx);
+	EVP_DecodeUpdate(ectx, (unsigned char*)p, &l, (unsigned char*)pctx->mbufContent.pMem, pctx->mbufContent.nLen);
     ddocDebug(3, "dencSaxHandleEndCipherValue", "Initial decoding: %d -> %d bytes", pctx->mbufContent.nLen, l);
     i = pctx->mbufContent.nLen - l;
-    EVP_DecodeFinal(&ectx, (unsigned char*)p+l, &i);
+	EVP_DecodeFinal(ectx, (unsigned char*)p+l, &i);
+	EVP_ENCODE_CTX_free(ectx);
     l += i;
     ddocDebug(3, "dencSaxHandleEndCipherValue", "Final decoding: %d bytes", i);
     ddocDebug(3, "dencSaxHandleEndCipherValue", "Decoding: %d bytes of base64 data, got: %d bytes", pctx->mbufContent.nLen, l);
@@ -663,8 +677,8 @@ typedef struct DEncDecryptParse_st {
   char* szPin;
   int nSlot;
   long lB64Len, lBinLen, lDecLen;
-  EVP_ENCODE_CTX ectx;
-  EVP_CIPHER_CTX dctx;
+  EVP_ENCODE_CTX *ectx;
+  EVP_CIPHER_CTX *dctx;
   int nB64SkipMode;
   char errmsg[100];
   char szCertSerial[100];
@@ -715,8 +729,9 @@ static void dencDecryptStartElementHandler(void *ctx, const xmlChar *name, const
      !ddocStackHasParentWithName(&(pctx->dencStack), (xmlChar*)"EncryptedKey", NULL)) {    
     if(pctx->nB64SkipMode == 0) {
       ddocDebug(4, "dencDecryptStartElementHandler", "Decode init");
-      EVP_DecodeInit(&(pctx->ectx));
-      EVP_CIPHER_CTX_init(&(pctx->dctx));      
+	  pctx->ectx = EVP_ENCODE_CTX_new();
+	  EVP_DecodeInit(pctx->ectx);
+	  EVP_CIPHER_CTX_init(pctx->dctx);
       pctx->lB64Len = pctx->lBinLen = pctx->lDecLen = 0;
     }
     pctx->nB64SkipMode++; // increment skip mode
@@ -825,14 +840,16 @@ static void dencDecryptEndElementHandler(void *ctx, const xmlChar *name)
       l1 = sizeof(buf1);
       memset(buf1, 0, l1);
       ddocDebug(4, "dencDecryptEndElementHandler", "Decoding: final into: %d", l1);
-      EVP_DecodeFinal(&(pctx->ectx), (unsigned char*)buf1, &l1);
+	  EVP_DecodeFinal(pctx->ectx, (unsigned char*)buf1, &l1);
+	  EVP_ENCODE_CTX_free(pctx->ectx);
       pctx->lBinLen += l1;
       ddocDebug(4, "dencDecryptEndElementHandler", "Decoded: final got: %d, total %d -> %d", l1, pctx->lB64Len, pctx->lBinLen);
       // decrypt decoded data
       l2 = sizeof(buf2);
       memset(buf2, 0, l2);
       ddocDebug(3, "dencDecryptEndElementHandler", "Decrypting: final into: %d", l2);
-      EVP_CipherFinal_ex(&(pctx->dctx), (unsigned char*)buf2, &l2);
+	  EVP_CipherFinal_ex(pctx->dctx, (unsigned char*)buf2, &l2);
+	  EVP_CIPHER_CTX_free(pctx->dctx);
       ddocDebug(4, "dencDecryptEndElementHandler", "Decrypted: final got: %d", l2);
       // write to file
       if(pctx->hOutFile) {
@@ -902,7 +919,7 @@ static void dencDecryptCharactersHandler(void *ctx, const xmlChar *ch, int len)
 	}
 	memset(buf1, 0, l1);
 	ddocDebug(4, "dencDecryptCharactersHandler", "Decoding: %d into: %d, skip: %d", len, l1, pctx->nB64SkipMode);
-	EVP_DecodeUpdate(&(pctx->ectx), (unsigned char*)buf1, &l1, (unsigned char*)ch, len);
+	EVP_DecodeUpdate(pctx->ectx, (unsigned char*)buf1, &l1, (unsigned char*)ch, len);
     ddocDebug(4, "dencDecryptCharactersHandler", "Decoded: %d got: %d, skip: %d", len, l1, pctx->nB64SkipMode);
 	// if this was the first block of decoded base64 data 
 	// then use the first 16 bytes as the IV value
@@ -911,7 +928,8 @@ static void dencDecryptCharactersHandler(void *ctx, const xmlChar *ch, int len)
 	  ddocDebug(4, "dencDecryptCharactersHandler", "Using 16 bytes for IV. Initing cipher");
 	  p1 += 16; // don't decrypt the IV data
 	  l1 -= 16;
-	  EVP_CipherInit_ex(&(pctx->dctx), EVP_aes_128_cbc(), NULL, 
+	  pctx->dctx = EVP_CIPHER_CTX_new();
+	  EVP_CipherInit_ex(pctx->dctx, EVP_aes_128_cbc(), NULL,
 			(const unsigned char*)pctx->mbufTransportKey.pMem, (const unsigned char*)buf1, DECRYPT);
 	}
 	pctx->lBinLen += l1;
@@ -927,7 +945,7 @@ static void dencDecryptCharactersHandler(void *ctx, const xmlChar *ch, int len)
 	//if(pctx->nB64SkipMode == 4)
 	//  l1 += 16; // ???
 	ddocDebug(4, "dencDecryptCharactersHandler", "Decrypting: %d into: %d", l1, l2);
-	EVP_CipherUpdate(&(pctx->dctx), (unsigned char*)buf2, &l, (const unsigned char*)p1, l1);
+	EVP_CipherUpdate(pctx->dctx, (unsigned char*)buf2, &l, (const unsigned char*)p1, l1);
 	ddocDebug(4, "dencDecryptCharactersHandler", "Decrypted: %d got: %d, skip: %d", l1, l, pctx->nB64SkipMode);
     if(buf1)
 	free(buf1); 

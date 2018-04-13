@@ -56,6 +56,18 @@ static char g_szDataFileFlush2[] = "<DataFile Id=\"%s\" ContentType=\"%s\">";
   #include <wchar.h>
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new()
+{
+	return (EVP_ENCODE_CTX*)OPENSSL_malloc(sizeof(EVP_ENCODE_CTX));
+}
+
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+#endif
+
 extern int ddocCheckFormatAndVer(const char* format, const char* version);
 extern char* canonicalizeXML(char* source, int len);
 extern int escapeXMLSymbols(const char* src, int srclen, char** dest);
@@ -79,7 +91,7 @@ typedef struct SigDocParse_st {
   char ctx4[300];
   char ctx5[300];
   BIO* bDataFile;
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
   SHA_CTX sctx, sctx2; // sha1 digest context and alternat dig context
   int errcode;
   char* szInputFileName;
@@ -405,7 +417,8 @@ void handleStartDataFile(SigDocParse* pctx, const xmlChar *name, const xmlChar *
     strncpy(pctx->ctx2, id, sizeof(pctx->ctx2)-1);
     ddocDebug(4, "handleStartDataFile", "Start DF: %s", id);
     if(ctype && !strcmp(ctype, CONTENT_EMBEDDED_BASE64)) {
-      EVP_DecodeInit(&(pctx->ectx));
+	  pctx->ectx = EVP_ENCODE_CTX_new();
+	  EVP_DecodeInit(pctx->ectx);
       ddocDebug(3, "handleStartDataFile", "Init sha1");
       SHA1_Init(&(pctx->sctx));
       SHA1_Init(&(pctx->sctx2));
@@ -494,7 +507,7 @@ void handleDataFile(SigDocParse* pctx, const xmlChar *value, int len)
 			i = (i + 512 > len) ? len : i + 512;
 			l = sizeof(buf);
 			memset(buf, 0, sizeof(buf));
-			EVP_DecodeUpdate(&(pctx->ectx), (unsigned char*)buf, &l, (unsigned char*)value + j, i - j);
+			EVP_DecodeUpdate(pctx->ectx, (unsigned char*)buf, &l, (unsigned char*)value + j, i - j);
 			BIO_write(pctx->bDataFile, buf, l);
 			j = i;
 		}
@@ -506,7 +519,7 @@ void handleDataFile(SigDocParse* pctx, const xmlChar *value, int len)
 			i = (i + 512 > len) ? len : i + 512;
 			l = sizeof(buf);
 			memset(buf, 0, sizeof(buf));
-			EVP_DecodeUpdate(&(pctx->ectx), (unsigned char*)buf, &l, (unsigned char*)value + j, i - j);
+			EVP_DecodeUpdate(pctx->ectx, (unsigned char*)buf, &l, (unsigned char*)value + j, i - j);
 			if(pctx->bDataFile) 		
 				BIO_write(pctx->bDataFile, buf, l);
 			buf[l] = 0;
@@ -553,7 +566,8 @@ void handleEndDataFile(SigDocParse* pctx, const xmlChar *name)
   if(pctx->bDataFile && 
      !strcmp(pDf->szContentType, CONTENT_EMBEDDED_BASE64)) {
     l1 = sizeof(buf);
-    EVP_DecodeFinal(&(pctx->ectx), (unsigned char*)buf, &l1);
+	EVP_DecodeFinal(pctx->ectx, (unsigned char*)buf, &l1);
+	EVP_ENCODE_CTX_free(pctx->ectx);
     BIO_write(pctx->bDataFile, buf, l1);
     BIO_free(pctx->bDataFile);
     pctx->bDataFile = NULL;			
@@ -2135,7 +2149,8 @@ static void extractStartElementHandler(void *ctx, const xmlChar *name, const xml
 	  ddocDebug(4, "extractStartElementHandler", "Init collecting DF: %s mode: %s", 
 		    pctx->ctx3, pctx->ctx1);
 	  if(!strcmp(pctx->ctx4, CONTENT_EMBEDDED_BASE64) && !pctx->bKeepBase64) {
-	    EVP_DecodeInit(&(pctx->ectx));
+		pctx->ectx = EVP_ENCODE_CTX_new();
+		EVP_DecodeInit(pctx->ectx);
 	    pctx->b64pos = 0;
 	    pctx->lSize = 0;
 	  }
@@ -2259,7 +2274,7 @@ void extractDecodeB64(SigDocParse* pctx, const char* ch, int len, int lastBlock)
       j = sizeof(decData);
       memset(decData, 0, j);
       ddocDebug(5, "extractDecodeB64", "decoding: %s", pctx->b64line);
-      EVP_DecodeUpdate(&(pctx->ectx), (unsigned char*)decData, &j, 
+	  EVP_DecodeUpdate(pctx->ectx, (unsigned char*)decData, &j,
 		     (unsigned char*)pctx->b64line, pctx->b64pos + 1);
       ddocDebug(4, "extractDecodeB64", "decoding: %d -> got: %d", pctx->b64pos, j);
       if(pctx->pMemBufDF)
@@ -2273,7 +2288,8 @@ void extractDecodeB64(SigDocParse* pctx, const char* ch, int len, int lastBlock)
       if(l == len && lastBlock) {
 	j = sizeof(decData);
 	memset(decData, 0, j);
-	EVP_DecodeFinal(&(pctx->ectx), (unsigned char*)decData, &j);
+	EVP_DecodeFinal(pctx->ectx, (unsigned char*)decData, &j);
+	EVP_ENCODE_CTX_free(pctx->ectx);
 	ddocDebug(4, "extractDecodeB64", "decoding final got: %d", j);
 	if(j > 0) {
 	  if(pctx->pMemBufDF)

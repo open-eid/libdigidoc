@@ -49,6 +49,17 @@
 #define snprintf   _snprintf
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new()
+{
+	return (EVP_ENCODE_CTX*)OPENSSL_malloc(sizeof(EVP_ENCODE_CTX));
+}
+
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+#endif
 
 //======================< DEncEncryptedData >==============================
 
@@ -894,6 +905,7 @@ int dencEncryptWithCert(X509* pCert, const char* data, int dLen, char* result, i
 {
   int err = ERR_OK;
   EVP_PKEY* pkey;
+  RSA *rsa;
 
   // check parameters
   RETURN_IF_NULL_PARAM(pCert)
@@ -905,7 +917,9 @@ int dencEncryptWithCert(X509* pCert, const char* data, int dLen, char* result, i
   if(err) return err;
   // encrypt data
   memset((char*)result, 0, *resLen);
-  *resLen = RSA_public_encrypt(dLen, (const unsigned char*)data, (unsigned char*)result, pkey->pkey.rsa, RSA_PKCS1_PADDING);
+  rsa = EVP_PKEY_get1_RSA(pkey);
+  *resLen = RSA_public_encrypt(dLen, (const unsigned char*)data, (unsigned char*)result, rsa, RSA_PKCS1_PADDING);
+  RSA_free(rsa);
   // cleanup
   EVP_PKEY_free(pkey); // should I ???
 
@@ -1317,7 +1331,7 @@ EXP_OPTION int dencEncryptedData_findEncryptedKeyByPKCS12(DEncEncryptedData* pEn
 int encryptDecrypt(DigiDocMemBuf *pInData, DigiDocMemBuf *pOutData,
 		   DigiDocMemBuf *pKey, int operation, const char* iv)
 {
-  EVP_CIPHER_CTX ectx;
+  EVP_CIPHER_CTX *ectx;
   int err = ERR_OK, len, i, nInLen, nOutLen;
   char padBuf[16], *pInMem;
   int lOrigLen, lEncLen;
@@ -1364,8 +1378,9 @@ int encryptDecrypt(DigiDocMemBuf *pInData, DigiDocMemBuf *pOutData,
   // copy init vector to begin of output data
   if(operation == ENCRYPT)
     memcpy(pOutData->pMem, iv, 16);
-  EVP_CIPHER_CTX_init(&ectx);
-  EVP_CipherInit_ex(&ectx, EVP_aes_128_cbc(), NULL, (const unsigned char*)pKey->pMem, (const unsigned char*)iv, operation);
+  ectx = EVP_CIPHER_CTX_new();
+  EVP_CIPHER_CTX_init(ectx);
+  EVP_CipherInit_ex(ectx, EVP_aes_128_cbc(), NULL, (const unsigned char*)pKey->pMem, (const unsigned char*)iv, operation);
   //EVP_CIPHER_CTX_set_padding(&ectx, 1);
   //checkErrors();
   lOrigLen += nInLen;
@@ -1375,14 +1390,14 @@ int encryptDecrypt(DigiDocMemBuf *pInData, DigiDocMemBuf *pOutData,
     pOutData->nLen = 16;
   else
     pOutData->nLen = 0;
-  EVP_CipherUpdate(&ectx, (unsigned char*)pOutData->pMem + pOutData->nLen, &i, (const unsigned char*)pInMem, nInLen);
+  EVP_CipherUpdate(ectx, (unsigned char*)pOutData->pMem + pOutData->nLen, &i, (const unsigned char*)pInMem, nInLen);
   lEncLen += i;
   pOutData->nLen += i;
   ddocDebug(3, "encryptDecrypt", "Initial update: %d into: %d -> %d", nInLen, nOutLen, i);
     
   //TODO: in 1.1 don't check len
   if(len && operation == ENCRYPT) {
-    EVP_CipherUpdate(&ectx, (unsigned char*)pOutData->pMem + pOutData->nLen, &i, (const unsigned char*)padBuf, len);
+	EVP_CipherUpdate(ectx, (unsigned char*)pOutData->pMem + pOutData->nLen, &i, (const unsigned char*)padBuf, len);
     ddocDebug(3, "encryptDecrypt", "Padding update: %d -> %d", len, i);
     pOutData->nLen += i;
     lOrigLen += len;
@@ -1390,12 +1405,12 @@ int encryptDecrypt(DigiDocMemBuf *pInData, DigiDocMemBuf *pOutData,
     lEncLen += i;
   }
   i = nOutLen;
-  EVP_CipherFinal_ex(&ectx, (unsigned char*)pOutData->pMem + pOutData->nLen, &i);
+  EVP_CipherFinal_ex(ectx, (unsigned char*)pOutData->pMem + pOutData->nLen, &i);
   ddocDebug(3, "encryptDecrypt", "Final update: %d into: %d", i, nOutLen);
   pOutData->nLen += i;
   lEncLen += i;
   ddocDebug(3, "encryptDecrypt", "Total input: %d encrypted: %d", lOrigLen, lEncLen);
-  EVP_CIPHER_CTX_cleanup(&ectx);
+  EVP_CIPHER_CTX_free(ectx);
   if(operation == DECRYPT) {
     // check ANSI X.923 padding
     len = (int)(unsigned char)((char*)pOutData->pMem)[pOutData->nLen-1];
@@ -1803,8 +1818,8 @@ EXP_OPTION int dencEncryptFile(DEncEncryptedData* pEncData,
 {
   int err = ERR_OK, l1, l2, l3, i, nBlock;
   long lOrigLen, lEncSize, lWritten;
-  EVP_CIPHER_CTX ectx;
-  EVP_ENCODE_CTX bctx;
+  EVP_CIPHER_CTX *ectx;
+  EVP_ENCODE_CTX *bctx;
   char convInFileName[250], convOutFileName[250];
   char buf1[4096], buf2[5120], buf3[6144], buf4[70], *p2;
   DigiDocMemBuf mbuf;
@@ -1841,10 +1856,12 @@ EXP_OPTION int dencEncryptFile(DEncEncryptedData* pEncData,
       fwrite(mbuf.pMem, 1, mbuf.nLen, hOutFile);
       ddocMemBuf_free(&mbuf);
       // init encryption
-      EVP_CIPHER_CTX_init(&ectx);
+	  ectx = EVP_CIPHER_CTX_new();
+	  EVP_CIPHER_CTX_init(ectx);
       // init encoding
-      EVP_EncodeInit(&bctx);
-      EVP_CipherInit_ex(&ectx, EVP_aes_128_cbc(), NULL, 
+	  bctx = EVP_ENCODE_CTX_new();
+	  EVP_EncodeInit(bctx);
+	  EVP_CipherInit_ex(ectx, EVP_aes_128_cbc(), NULL,
 			(const unsigned char*)pEncData->mbufTransportKey.pMem,
 			(const unsigned char*)pEncData->initVector, ENCRYPT);
       //EVP_CIPHER_CTX_set_padding(&ectx, 1);
@@ -1876,7 +1893,7 @@ EXP_OPTION int dencEncryptFile(DEncEncryptedData* pEncData,
 	    p2 += 16;
 	    l2 -= 16;
 	  }
-	  EVP_CipherUpdate(&ectx, (unsigned char*)p2, &l2, (const unsigned char*)buf1, l1);
+	  EVP_CipherUpdate(ectx, (unsigned char*)p2, &l2, (const unsigned char*)buf1, l1);
 	  ddocDebug(3, "dencEncryptFile", "Input: %d, block: %d, buf: %d encrypted: %d", l1, nBlock, sizeof(buf2), l2);
 	  lEncSize += l2;
 	  // if it's the final block
@@ -1887,7 +1904,7 @@ EXP_OPTION int dencEncryptFile(DEncEncryptedData* pEncData,
 	      p2 += 16;
 	      l3 -= 16;
 	    }
-	    EVP_CipherFinal_ex(&ectx, (unsigned char*)p2, &l3);
+		EVP_CipherFinal_ex(ectx, (unsigned char*)p2, &l3);
 	    ddocDebug(3, "dencEncryptFile", "Buf: %d Final encrypted: %d", sizeof(buf2) - l2, l3);
 	    l2 += l3;
 	    lEncSize += l3;
@@ -1898,18 +1915,19 @@ EXP_OPTION int dencEncryptFile(DEncEncryptedData* pEncData,
 	  // encode also the IV vector at the beginning of first block
 	  if(nBlock == 0)
 	    l2 += 16;
-	  EVP_EncodeUpdate(&bctx, (unsigned char*)buf3, &l3, (byte*)buf2, l2);
+	  EVP_EncodeUpdate(bctx, (unsigned char*)buf3, &l3, (byte*)buf2, l2);
 	  lWritten += l3;
 	  fwrite(buf3, 1, l3, hOutFile);
 	  ddocDebug(3, "dencEncryptFile", "In: %d, encrypted: %d, base64: %d", l1, l2, l3);
 	}
 	nBlock++;
       } while(!err && l1 > 0);
-      EVP_CIPHER_CTX_cleanup(&ectx);
+	  EVP_CIPHER_CTX_free(ectx);
       // write the last portion of line data
       l3 = sizeof(buf3);
       memset(buf3, 0, l3);
-      EVP_EncodeFinal(&bctx, (unsigned char*)buf3, &l3);
+	  EVP_EncodeFinal(bctx, (unsigned char*)buf3, &l3);
+	  EVP_ENCODE_CTX_free(bctx);
       lWritten += l3;
       fwrite(buf3, 1, l3, hOutFile);
       ddocDebug(4, "dencEncryptFile", "Total input: %d, blocks: %d, encrypted: %d written: %d", lOrigLen, nBlock, lEncSize, lWritten);

@@ -35,6 +35,47 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_MD_CTX *EVP_MD_CTX_new()
+{
+	return (EVP_MD_CTX*)OPENSSL_malloc(sizeof(EVP_MD_CTX));
+}
+
+static void EVP_MD_CTX_free(EVP_MD_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+
+static int OCSP_resp_get0_id(const OCSP_BASICRESP *bs, const ASN1_OCTET_STRING **pid, const X509_NAME **pname)
+{
+	*pid = NULL;
+	*pname = NULL;
+	const OCSP_RESPID *rid = bs->tbsResponseData->responderId;
+	if (rid->type == V_OCSP_RESPID_NAME)
+		*pname = rid->value.byName;
+	else if (rid->type == V_OCSP_RESPID_KEY)
+		*pid = rid->value.byKey;
+	else
+		return 0;
+	return 1;
+}
+
+static const ASN1_GENERALIZEDTIME *OCSP_resp_get0_produced_at(const OCSP_BASICRESP* bs)
+{
+	return bs->tbsResponseData->producedAt;
+}
+
+static const OCSP_CERTID *OCSP_SINGLERESP_get0_id(const OCSP_SINGLERESP *single)
+{
+	return single->certId;
+}
+
+static const ASN1_OCTET_STRING *OCSP_resp_get0_signature(const OCSP_BASICRESP *bs)
+{
+	return bs->signature;
+}
+#endif
+
 //============================================================
 // Sets a string element of a struct to a new value
 // dest - element pointer
@@ -3699,28 +3740,26 @@ int ddocGetOcspRespIdTypeAndValue(OCSP_RESPONSE* pResp,
   int err = ERR_OK;
   OCSP_BASICRESP *br = NULL;
   
+  const X509_NAME *name = NULL;
+  const ASN1_OCTET_STRING *id = NULL;
   RETURN_IF_NULL_PARAM(pResp);
   RETURN_IF_NULL_PARAM(pType);
   RETURN_IF_NULL_PARAM(pMbufRespId);
   if((br = OCSP_response_get1_basic(pResp)) == NULL) 
     SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_NO_BASIC_RESP);
   if(!err && br) {
-    switch(br->tbsResponseData->responderId->type) {
-      case V_OCSP_RESPID_NAME: 
-	*pType = RESPID_NAME_TYPE; 
-	ddocMemSetLength(pMbufRespId, 300);
+	OCSP_resp_get0_id(br, &id, &name);
+	if(name) {
+	  *pType = RESPID_NAME_TYPE;
+	  ddocMemSetLength(pMbufRespId, 300);
         //X509_NAME_oneline(br->tbsResponseData->responderId->value.byName, (char*)pMbufRespId->pMem, pMbufRespId->nLen);
 		//AM 26.09.08
-		err = ddocCertGetDNFromName(br->tbsResponseData->responderId->value.byName, pMbufRespId);
+		err = ddocCertGetDNFromName((X509_NAME*)name, pMbufRespId);
 		//RETURN_IF_NOT(err == ERR_OK, err);
-	break;
-      case V_OCSP_RESPID_KEY: 
-	*pType = RESPID_KEY_TYPE; 
-	err = ddocMemAssignData(pMbufRespId, 
-		  (const char*)br->tbsResponseData->responderId->value.byKey->data, 
-		  br->tbsResponseData->responderId->value.byKey->length);
-	break;
-      default:
+	} else if(id) {
+	  *pType = RESPID_KEY_TYPE;
+	  err = ddocMemAssignData(pMbufRespId, (const char*)id->data, id->length);
+	} else {
         SET_LAST_ERROR(ERR_OCSP_WRONG_RESPID);
     }
   }
@@ -3800,7 +3839,7 @@ int ddocNotInfo_GetBasicResp(const NotaryInfo* pNotary, OCSP_RESPONSE **ppResp,
     *ppBasResp = OCSP_response_get1_basic(*ppResp);
     if(*ppBasResp) {
 	  if(ppSingle)
-        *ppSingle = sk_OCSP_SINGLERESP_value((*ppBasResp)->tbsResponseData->responses, 0);
+		*ppSingle = OCSP_resp_get0(*ppBasResp, 0);
     }
     else
       return ERR_OCSP_NO_BASIC_RESP;
@@ -3818,17 +3857,20 @@ EXP_OPTION const char* ddocNotInfo_GetResponderId_Type(const NotaryInfo* pNotary
   int err = ERR_OK;
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
+  const ASN1_OCTET_STRING *id = NULL;
+  const X509_NAME *name = NULL;
   char *p1 = RESPID_NAME_VALUE; // default value is name - usefull in format 1.0 where we had no good OCSP response
 
   RETURN_OBJ_IF_NULL(pNotary, NULL);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, NULL);
   if(!err && br) {
-    switch(br->tbsResponseData->responderId->type) {
-    case V_OCSP_RESPID_NAME: p1 = RESPID_NAME_VALUE; break;
-    case V_OCSP_RESPID_KEY: p1 = RESPID_KEY_VALUE; break;
-    default:
+	OCSP_resp_get0_id(br, &id, &name);
+	if(name)
+		p1 = RESPID_NAME_VALUE;
+	else if(id)
+		p1 = RESPID_KEY_VALUE;
+	else
       SET_LAST_ERROR(ERR_OCSP_WRONG_RESPID);
-    }
   }
   if(pResp)
     OCSP_RESPONSE_free(pResp);
@@ -3850,15 +3892,17 @@ EXP_OPTION int ddocNotInfo_GetThisUpdate(const NotaryInfo* pNotary, DigiDocMemBu
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
   OCSP_SINGLERESP *single = NULL;
+  ASN1_GENERALIZEDTIME *thisUpdate = NULL;
 
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pMBuf);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, &single);
   if(!err && br && single) {
     err = ddocMemSetLength(pMBuf, 50);
-    ddocDebug(3, "ddocNotInfo_GetThisUpdate", "This update: %s", single->thisUpdate);
-    if(!err && single->thisUpdate)
-      err = asn1time2str(NULL, single->thisUpdate, (char*)pMBuf->pMem, pMBuf->nLen);   
+	OCSP_single_get0_status(single, NULL, NULL, &thisUpdate, NULL);
+	ddocDebug(3, "ddocNotInfo_GetThisUpdate", "This update: %s", thisUpdate);
+	if(!err && thisUpdate)
+	  err = asn1time2str(NULL, thisUpdate, (char*)pMBuf->pMem, pMBuf->nLen);
   }
   if(pResp)
     OCSP_RESPONSE_free(pResp);
@@ -3881,13 +3925,15 @@ int ddocNotInfo_GetThisUpdate_timet(const NotaryInfo* pNotary, time_t* pTime)
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
   OCSP_SINGLERESP *single = NULL;
+  ASN1_GENERALIZEDTIME *thisUpdate = NULL;
 
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pTime);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, &single);
   if(!err && br && single) {
-    if(!err && single->thisUpdate)
-      err = asn1time2time_t_local(single->thisUpdate, pTime);
+	OCSP_single_get0_status(single, NULL, NULL, &thisUpdate, NULL);
+	if(!err && thisUpdate)
+	  err = asn1time2time_t_local(thisUpdate, pTime);
   }
   if(pResp)
     OCSP_RESPONSE_free(pResp);
@@ -3908,13 +3954,14 @@ int ddocNotInfo_GetProducedAt_timet(const NotaryInfo* pNotary, time_t* pTime)
   int err = ERR_OK;
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
-  
+  const ASN1_GENERALIZEDTIME *producedAt = NULL;
 
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pTime);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, NULL);
-  if(!err && br && br->tbsResponseData && br->tbsResponseData->producedAt) {
-    err = asn1time2time_t_local(br->tbsResponseData->producedAt, pTime);
+  producedAt = OCSP_resp_get0_produced_at(br);
+  if(!err && br && producedAt) {
+	err = asn1time2time_t_local((ASN1_GENERALIZEDTIME*)producedAt, pTime);
   }
 	//AM 22.06.08 lets free br too
 	if(br)
@@ -3954,14 +4001,16 @@ EXP_OPTION int ddocNotInfo_GetNextUpdate(const NotaryInfo* pNotary, DigiDocMemBu
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
   OCSP_SINGLERESP *single = NULL;
+  ASN1_GENERALIZEDTIME *nextUpdate = NULL;
 
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pMBuf);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, &single);
   if(!err && br && single) {
     err = ddocMemSetLength(pMBuf, 50);
-    if(!err && single->nextUpdate)
-      err = asn1time2str(NULL, single->nextUpdate, (char*)pMBuf->pMem, pMBuf->nLen);   
+	OCSP_single_get0_status(single, NULL, NULL, NULL, &nextUpdate);
+	if(!err && nextUpdate)
+	  err = asn1time2str(NULL, nextUpdate, (char*)pMBuf->pMem, pMBuf->nLen);
   }
   if(pResp)
     OCSP_RESPONSE_free(pResp);
@@ -3983,13 +4032,17 @@ int ddocNotInfo_GetIssuerNameHash(const NotaryInfo* pNotary, DigiDocMemBuf* pMBu
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
   OCSP_SINGLERESP *single = NULL;
+  ASN1_OCTET_STRING *issuerNameHash = NULL;
+  const OCSP_CERTID *cid = NULL;
 
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pMBuf);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, &single);
-  if(!err && br && single->certId) {
-    err = ddocMemAssignData(pMBuf, (const char*)single->certId->issuerNameHash->data, 
-			    single->certId->issuerNameHash->length);
+  if(!err && br) {
+	cid = OCSP_SINGLERESP_get0_id(OCSP_resp_get0(br, 0));
+	OCSP_id_get0_info(&issuerNameHash, NULL, NULL, NULL, (OCSP_CERTID*)cid);
+	err = ddocMemAssignData(pMBuf, (const char*)issuerNameHash->data,
+				issuerNameHash->length);
   }
   if(pResp)
     OCSP_RESPONSE_free(pResp);
@@ -4011,13 +4064,18 @@ int ddocNotInfo_GetIssuerKeyHash(const NotaryInfo* pNotary, DigiDocMemBuf* pMBuf
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
   OCSP_SINGLERESP *single = NULL;
+  ASN1_OCTET_STRING *issuerKeyHash = NULL;
+  const OCSP_CERTID *cid = NULL;
 
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pMBuf);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, &single);
-  if(!err && br && single->certId) {
-    err = ddocMemAssignData(pMBuf, (const char*)single->certId->issuerKeyHash->data, 
-			    single->certId->issuerKeyHash->length);
+
+  if(!err && br) {
+	cid = OCSP_SINGLERESP_get0_id(OCSP_resp_get0(br, 0));
+	OCSP_id_get0_info(NULL, NULL, &issuerKeyHash, NULL, (OCSP_CERTID*)cid);
+	err = ddocMemAssignData(pMBuf, (const char*)issuerKeyHash->data,
+				issuerKeyHash->length);
   }
   if(pResp)
     OCSP_RESPONSE_free(pResp);
@@ -4040,6 +4098,7 @@ int ddocNotInfo_GetOcspRealDigest(const SignedDoc* pSigDoc, const NotaryInfo* pN
   OCSP_BASICRESP *br = NULL;
   OCSP_SINGLERESP *single = NULL;
   X509_EXTENSION *ext = NULL;
+  ASN1_OCTET_STRING *value = NULL;
   byte* p = 0, buf2[DIGEST_LEN256 * 2 + 2];
     
   RETURN_IF_NULL_PARAM(pNotary);
@@ -4051,8 +4110,9 @@ int ddocNotInfo_GetOcspRealDigest(const SignedDoc* pSigDoc, const NotaryInfo* pN
     if(nIdx >= 0) {
         ext = OCSP_BASICRESP_get_ext(br, nIdx);
         if(ext != NULL) {
-            int l1 = ASN1_STRING_length(ext->value);
-            p = ASN1_STRING_data(ext->value);
+			value = X509_EXTENSION_get_data(ext);
+			int l1 = ASN1_STRING_length(value);
+			p = ASN1_STRING_data(value);
             if(l1 > 20 && p[0] == V_ASN1_OCTET_STRING && p[1] == l1-2)
               err = ddocMemAssignData(pMBuf, (const char*)p+2, l1-2);
             else
@@ -4093,13 +4153,15 @@ int ddocNotInfo_GetOcspSignatureValue(const NotaryInfo* pNotary, DigiDocMemBuf* 
   int err = ERR_OK;
   OCSP_RESPONSE *pResp = 0;
   OCSP_BASICRESP *br = NULL;
+  const ASN1_OCTET_STRING *signature = NULL;
 
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pMBuf);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, NULL);
   if(!err && br) {
-    err = ddocMemAssignData(pMBuf, (const char*)br->signature->data, 
-			    br->signature->length);
+	signature = OCSP_resp_get0_signature(br);
+	err = ddocMemAssignData(pMBuf, (const char*)signature->data,
+				signature->length);
   }
   if(pResp)
     OCSP_RESPONSE_free(pResp);
@@ -4328,7 +4390,7 @@ EXP_OPTION int calculateSignatureWithPkcs12(SignedDoc* pSigDoc, SignatureInfo* p
   int l2;
   EVP_PKEY *pkey = 0;
   X509* x509 = 0;
-  EVP_MD_CTX  ctx;
+  EVP_MD_CTX *ctx;
   DigiDocMemBuf mbuf1;
 
   RETURN_IF_NULL_PARAM(pSigInfo);
@@ -4397,9 +4459,11 @@ EXP_OPTION int calculateSignatureWithPkcs12(SignedDoc* pSigDoc, SignatureInfo* p
   sigLen = sizeof(signature);
   memset(signature, 0, sizeof(signature));
   // sign data
-  EVP_SignInit(&ctx, EVP_sha1());
-  EVP_SignUpdate(&ctx, buf1, (unsigned long)strlen(buf1));
-  err = EVP_SignFinal(&ctx, signature, &sigLen, pkey);
+  ctx = EVP_MD_CTX_new();
+  EVP_SignInit(ctx, EVP_sha1());
+  EVP_SignUpdate(ctx, buf1, (unsigned long)strlen(buf1));
+  err = EVP_SignFinal(ctx, signature, &sigLen, pkey);
+  EVP_MD_CTX_free(ctx);
   free(buf1);
   if(err == ERR_LIB_NONE)
 	err = ERR_OK;

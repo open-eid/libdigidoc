@@ -38,6 +38,18 @@
   #include <wchar.h>
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10010000L
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new()
+{
+	return (EVP_ENCODE_CTX*)OPENSSL_malloc(sizeof(EVP_ENCODE_CTX));
+}
+
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+}
+#endif
+
 #define ST_START 0
 #define ST_XML   1
 #define ST_TAG_NM 2
@@ -71,7 +83,7 @@ EXP_OPTION int ddocExtractDataFile(SignedDoc* pSigDoc, const char* szFileName,
   char chars[1050], tag[100], attr[100], con[1030], dec[70], b64line[70];
   unsigned char b64 = 0, nNc = 0, bFound = 0;
   void *pBuf;  
-  EVP_ENCODE_CTX ectx;
+  EVP_ENCODE_CTX *ectx;
 #ifdef WIN32
   wchar_t *convFileName = 0, *convDataFileName = 0; i= 0;
   err = utf82unicode((const char*)szFileName, (char**)&convFileName, &i);
@@ -156,7 +168,10 @@ EXP_OPTION int ddocExtractDataFile(SignedDoc* pSigDoc, const char* szFileName,
 					if(bFound) {
 						eState = ST_DF_CON;
 						if(b64)
-							EVP_DecodeInit(&ectx);
+						{
+							ectx = EVP_ENCODE_CTX_new();
+							EVP_DecodeInit(ectx);
+						}
 					} else
 						eState = ST_CON; // tag endded - content
 					lc = 0;
@@ -270,7 +285,10 @@ EXP_OPTION int ddocExtractDataFile(SignedDoc* pSigDoc, const char* szFileName,
 					lc = 0;
 					con[lc] = 0;
 					if(b64)
-						EVP_DecodeInit(&ectx);
+					{
+						ectx = EVP_ENCODE_CTX_new();
+						EVP_DecodeInit(ectx);
+					}
 				} 
 				break;
 			case ST_DF_CON:
@@ -292,7 +310,7 @@ EXP_OPTION int ddocExtractDataFile(SignedDoc* pSigDoc, const char* szFileName,
 									b64line[lb] = 0;
 									ld = sizeof(dec);
 									dec[0] = 0;
-									EVP_DecodeUpdate(&ectx, (unsigned char*)dec, &ld, (unsigned char*)b64line, lb);
+									EVP_DecodeUpdate(ectx, (unsigned char*)dec, &ld, (unsigned char*)b64line, lb);
 									lExtr += ld;
 									if(ld > 0)
 									fwrite(dec, 1, ld, fOut);
@@ -349,7 +367,7 @@ EXP_OPTION int ddocExtractDataFile(SignedDoc* pSigDoc, const char* szFileName,
 							b64line[lb] = 0;
 							ld = sizeof(dec);
 							dec[0] = 0;
-							EVP_DecodeUpdate(&ectx, (unsigned char*)dec, &ld, (unsigned char*)b64line, lb);
+							EVP_DecodeUpdate(ectx, (unsigned char*)dec, &ld, (unsigned char*)b64line, lb);
 							lExtr += ld;
 							if(ld > 0)
 								fwrite(dec, 1, ld, fOut);
@@ -358,7 +376,8 @@ EXP_OPTION int ddocExtractDataFile(SignedDoc* pSigDoc, const char* szFileName,
 					}
 					ld = 0;
 					dec[ld] = 0;
-					EVP_DecodeFinal(&ectx, (unsigned char*)dec, &ld);
+					EVP_DecodeFinal(ectx, (unsigned char*)dec, &ld);
+					EVP_ENCODE_CTX_free(ectx);
 					lExtr += ld;
 					if(ld)
 						fwrite(dec, 1, ld, fOut);

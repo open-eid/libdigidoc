@@ -103,6 +103,19 @@ Contact for assistance by email abi@id.ee or http://www.id.ee
 5. Execute
 
         libdigidoc/cdigidoc.exe
+	
+### Fedora 24
+
+1. Install dependencies
+
+        sudo dnf install cmake libxml2-devel doxygen enca-devel zlib-devel opencryptoki-devel
+	- install libiconv from source http://savannah.gnu.org/projects/libiconv/ 
+	  or get it from https://pkgs.org/fedora-24/forensics-x86_64/libiconv-1.14-3.fc24.x86_64.rpm.html
+	- build and install openssl0.9.8 from https://github.com/openssl/openssl/archive/OpenSSL_0_9_8zh.tar.gz 
+	  or ensure 0.9.8 interfaces are available by configuring with --api=0.9.8 see 
+	  https://wiki.openssl.org/index.php/1.1_API_Changes and https://github.com/rbsec/sslscan/issues/108  
+
+2. Complete rest of steps as for Ubuntu.  Be sure to add correct paths to openssl 0.9.8 in the configure step using cmake.
 
 ## Support
 Official builds are provided through official distribution point [installer.id.ee](https://installer.id.ee). If you want support, you need to be using official builds. Contact for assistance by email [abi@id.ee](mailto:abi@id.ee) or [www.id.ee](http://www.id.ee).

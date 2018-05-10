@@ -50,6 +50,8 @@ static int OCSP_resp_get0_id(const OCSP_BASICRESP *bs, const ASN1_OCTET_STRING *
 {
 	*pid = NULL;
 	*pname = NULL;
+	if(!bs || !bs->tbsResponseData)
+		return 0;
 	const OCSP_RESPID *rid = bs->tbsResponseData->responderId;
 	if (rid->type == V_OCSP_RESPID_NAME)
 		*pname = rid->value.byName;
@@ -62,17 +64,17 @@ static int OCSP_resp_get0_id(const OCSP_BASICRESP *bs, const ASN1_OCTET_STRING *
 
 static const ASN1_GENERALIZEDTIME *OCSP_resp_get0_produced_at(const OCSP_BASICRESP* bs)
 {
-	return bs->tbsResponseData->producedAt;
+	return bs && bs->tbsResponseData ? bs->tbsResponseData->producedAt : NULL;
 }
 
 static const OCSP_CERTID *OCSP_SINGLERESP_get0_id(const OCSP_SINGLERESP *single)
 {
-	return single->certId;
+	return single ? single->certId : NULL;
 }
 
 static const ASN1_OCTET_STRING *OCSP_resp_get0_signature(const OCSP_BASICRESP *bs)
 {
-	return bs->signature;
+	return bs ? bs->signature : NULL;
 }
 #endif
 
@@ -3959,7 +3961,8 @@ int ddocNotInfo_GetProducedAt_timet(const NotaryInfo* pNotary, time_t* pTime)
   RETURN_IF_NULL_PARAM(pNotary);
   RETURN_IF_NULL_PARAM(pTime);
   err = ddocNotInfo_GetBasicResp(pNotary, &pResp, &br, NULL);
-  producedAt = OCSP_resp_get0_produced_at(br);
+  if(br)
+	producedAt = OCSP_resp_get0_produced_at(br);
   if(!err && br && producedAt) {
 	err = asn1time2time_t_local((ASN1_GENERALIZEDTIME*)producedAt, pTime);
   }

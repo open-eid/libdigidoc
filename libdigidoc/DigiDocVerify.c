@@ -60,12 +60,17 @@ static void EVP_MD_CTX_free(EVP_MD_CTX *ctx)
 
 static const ASN1_OCTET_STRING *OCSP_resp_get0_signature(const OCSP_BASICRESP *bs)
 {
-	return bs->signature;
+	return bs ? bs->signature : NULL;
 }
 
 static X509_VERIFY_PARAM *X509_STORE_get0_param(X509_STORE *ctx)
 {
-	return ctx->param;
+	return ctx ? ctx->param : NULL;
+}
+
+const OCSP_CERTID *OCSP_SINGLERESP_get0_id(const OCSP_SINGLERESP *single)
+{
+	return single ? single->certId : NULL;
 }
 #endif
 
@@ -1405,7 +1410,7 @@ int verifyOcspCertId(OCSP_RESPONSE* pResp, X509* pCert, X509* pCaCert)
   OCSP_BASICRESP *br = NULL;
   OCSP_RESPDATA  *rd = NULL;
   OCSP_SINGLERESP *single = NULL;
-  OCSP_CERTID *cid = NULL;
+  const OCSP_CERTID *cid = NULL;
   int err = ERR_OK;
   DigiDocMemBuf mbuf1, mbuf2, mbuf3;
   ASN1_OCTET_STRING *issuerNameHash = NULL, *issuerKeyHash = NULL;
@@ -1427,9 +1432,13 @@ int verifyOcspCertId(OCSP_RESPONSE* pResp, X509* pCert, X509* pCaCert)
   ddocDebug(4, "verifyOcspCertId", "for cert: %ld, cn: %s, ca: %s", X509_get_serialNumber(pCert), mbuf2.pMem, mbuf3.pMem);
   ddocMemBuf_free(&mbuf2);
   ddocMemBuf_free(&mbuf3);
-  cid = OCSP_cert_to_id(EVP_sha1(), pCert, pCaCert);
+  if(OCSP_resp_count(br) != 1)
+	SET_LAST_ERROR_RETURN_CODE(ERR_OCSP_ONE_RESPONSE);
+  single = OCSP_resp_get0(br, 0);
+  RETURN_IF_NULL(single);
+  cid = OCSP_SINGLERESP_get0_id(single);
   RETURN_IF_NULL(cid);
-  OCSP_id_get0_info(&issuerNameHash, NULL, &issuerKeyHash, &serialNumber, cid);
+  OCSP_id_get0_info(&issuerNameHash, NULL, &issuerKeyHash, &serialNumber, (OCSP_CERTID*)cid);
   // check serial number
   if(ASN1_INTEGER_cmp(serialNumber, X509_get_serialNumber(pCert)) != 0) {
     ddocDebug(4, "verifyOcspCertId", "Looking for cert-nr: %ld buf found %ld", 

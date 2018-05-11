@@ -55,18 +55,6 @@ Description: DigiDoc digital signature library tools
  This package contains tools for manipulating signatures command line with the
  DigiDoc digital signature library.
 
-Package: libdigidoc-dbg
-Architecture: any
-Section: debug
-Depends:
- libdigidoc2 (= ${binary:Version}),
- libssl1.0.0-dbg,
- libxml2-dbg,
- ${misc:Depends}
-Description: Debugging symbols for libdigidoc2
- This package contains the debugging symbols for DigiDoc digital signature
- library.
-
 Package: libdigidoc-dev
 Architecture: any
 Section: libdevel

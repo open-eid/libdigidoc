@@ -3,18 +3,16 @@ matrix:
   include:
   - os: linux
     env: TARGET=ubuntu:16.04
-    sudo: false
   - os: linux
     env: TARGET=ubuntu:18.04
-    sudo: false
   - os: linux
     env: TARGET=i386/ubuntu:16.04
-    sudo: false
   - os: osx
     env: TARGET=osx
-sudo: required
+    sudo: required
+sudo: false
 dist: trusty
-osx_image: xcode9.2
+osx_image: xcode9.3
 services:
 - docker
 cache: ccache
@@ -32,9 +30,9 @@ script: case ${TARGET} in
     cd ..;
     ;;
   *)
-    docker run -e BUILD_NUMBER=${BUILD_NUMBER} -e COVERITY_SCAN_TOKEN=${COVERITY_SCAN_TOKEN} -e TRAVIS_BRANCH=${TRAVIS_BRANCH} -e TARGET=${TARGET} -v $(pwd):$(pwd) -t "${TARGET}" /bin/bash -c "cd $(pwd);"'
+    docker run -e BUILD_NUMBER=${BUILD_NUMBER} -e COVERITY_SCAN_TOKEN=${COVERITY_SCAN_TOKEN} -e TRAVIS_BRANCH=${TRAVIS_BRANCH} -e TARGET=${TARGET} -v ${HOME}:${HOME} -t "${TARGET}" /bin/bash -c "cd $(pwd);"'
       apt-get update -qq;
-      apt-get install -y dh-make devscripts dpkg-dev cdbs cmake libxml2-dev libssl-dev git curl wget ruby;
+      apt-get install -y dh-make devscripts cdbs cmake libxml2-dev libssl-dev doxygen git curl wget ruby;
       export VERSION=$(grep project CMakeLists.txt | egrep -o "([0-9]{1,}\.)+[0-9]{1,}").${BUILD_NUMBER};
       export DEBFULLNAME="Travis";
       export DEBEMAIL="travis-ci@travis";
@@ -45,12 +43,11 @@ script: case ${TARGET} in
         export COVERITY_SCAN_PROJECT_NAME="open-eid/libdigidoc";
         export COVERITY_SCAN_NOTIFICATION_EMAIL="raul@metsma.ee";
         export COVERITY_SCAN_BRANCH_PATTERN=coverity_scan;
-        export COVERITY_SCAN_BUILD_COMMAND_PREPEND="mkdir coverity && cd coverity && cmake ..";
+        export COVERITY_SCAN_BUILD_COMMAND_PREPEND="cmake .";
         export COVERITY_SCAN_BUILD_COMMAND=make;
         wget -O - https://scan.coverity.com/scripts/travisci_build_coverity_scan.sh | bash;
       fi;
       git clean -dxf';
-    ;;
   esac
 
 before_deploy:

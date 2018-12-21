@@ -47,6 +47,8 @@
 #include <openssl/pkcs12.h>
 #include <openssl/rand.h>
 
+#include <string.h>
+
 #if OPENSSL_VERSION_NUMBER < 0x10010000L
 static EVP_MD_CTX *EVP_MD_CTX_new()
 {

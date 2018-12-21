@@ -32,6 +32,7 @@
 #include <libdigidoc/DigiDocOCSP.h>
 #include <libdigidoc/DigiDocDfExtract.h>
 #include <libdigidoc/DigiDocVerify.h>
+#include <libdigidoc/DigiDocGen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>

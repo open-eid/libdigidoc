@@ -310,6 +310,10 @@ EXP_OPTION int verifyCertificateByOCSPWithIp(X509* pCert, const X509** caCerts,
   //--------------------------------------------------
   EXP_OPTION int readSubjectKeyIdentifier(X509* pCert, DigiDocMemBuf* pMemBuf);
 
+  EXP_OPTION int ddocCertGetDNPart(X509* pCert, DigiDocMemBuf* pMemBuf, int nNid, int bIssuer);
+
+  EXP_OPTION int ddocCertGetDN(X509* pCert, DigiDocMemBuf* pMemBuf, int bIssuer);
+
 //================< deprecated functions> =================================
 // these functions are deprecated. Use the replacements in DigiDocCert.h
 // these functions will be removed in future releases!

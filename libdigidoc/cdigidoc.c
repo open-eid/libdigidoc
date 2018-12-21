@@ -69,6 +69,7 @@ char* g_szProgNameVer = "cdigidoc/"DIGIDOC_VERSION;
 //==========< forward defs >========================
 
 void printErrorsAndWarnings(SignedDoc* pSigDoc);
+int isWarning(SignedDoc* pSigDoc, int nErrCd);
 
 //==========< helper functions for argument handling >====================
 

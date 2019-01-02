@@ -42,6 +42,7 @@
 #include <openssl/pkcs12.h>
 #include <openssl/rand.h>
 #include <ctype.h>
+#include <string.h>
 
 #ifdef FRAMEWORK
 #ifdef __APPLE__

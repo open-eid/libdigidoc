@@ -94,6 +94,7 @@ EXP_OPTION int ddocReadNewSignaturesFromDdoc(SignedDoc* pSigDoc, const char* szF
 //AM 13.03.2008
 void decodeURI(const char* uri, char* id, int nIdLen, char* adr, int nAdrLen);
 
+EXP_OPTION int ddocAddSignatureFromMemory(SignedDoc* pSigDoc, const char* szFileName, const void* pSigBuf, int nSigLen);
 
     
 #ifdef  __cplusplus

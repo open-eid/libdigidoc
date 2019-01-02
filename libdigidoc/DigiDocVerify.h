@@ -168,6 +168,7 @@ EXP_OPTION int verifyEstIDSignature2(const byte* digest, int digestLen, int nDig
 //============================================================
 EXP_OPTION int checkDdocWrongDigests(const SignedDoc* pSigDoc);
     
+EXP_OPTION int validateElementPath(XmlElemInfo* pElem);
 
 #ifdef  __cplusplus
 }

@@ -16,7 +16,7 @@ You need the following dependent librarys to build libdigidoc:
 Full documentation
 ----------------------------
 For documentation please see in doc folder SK-CDD-PRG-GUIDE
-Contact for assistance by email abi@id.ee or http://www.id.ee
+Contact our support via www.id.ee for assistance.
 
 ## Building
 [![Build Status](https://travis-ci.org/open-eid/libdigidoc.svg?branch=master)](https://travis-ci.org/open-eid/libdigidoc)

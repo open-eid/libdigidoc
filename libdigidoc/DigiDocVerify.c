@@ -20,6 +20,7 @@
 //                      Creation
 //==================================================
 
+#define WITH_DEPRECATED_FUNCTIONS
 #include "DigiDocVerify.h"
 #include "DigiDocError.h"
 #include "DigiDocLib.h"

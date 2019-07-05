@@ -26,6 +26,7 @@
 #include <libdigidoc/DigiDocObj.h>
 #include <libdigidoc/DigiDocConvert.h>
 #include <libdigidoc/DigiDocGen.h>
+#include <libdigidoc/DigiDocSAXParser.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>

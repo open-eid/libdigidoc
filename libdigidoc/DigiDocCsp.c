@@ -406,22 +406,20 @@ X509 *Digi_FindCertByResponse(StoreHandle *hStore, OCSP_RESPONSE *poResponse)
 {
   X509 *poX509 = NULL;
   PCCERT_CONTEXT pCert = NULL;
-  OCSP_RESPID    *rid = NULL;
   OCSP_BASICRESP *br = NULL;
-  OCSP_RESPDATA  *rd = NULL;
+  const X509_NAME *name = NULL;
   int iLen;
   char sCN[255];
 
   if (poResponse != NULL) {
 	if ((br = OCSP_response_get1_basic(poResponse)) == NULL)
-          return(poX509); 
-	rd = br->tbsResponseData;
-	rid =  rd->responderId;
-	if (rid->type != V_OCSP_RESPID_NAME) {
-          if(br) OCSP_BASICRESP_free(br);
-          return(poX509); 
-        }
-	iLen = X509_NAME_get_text_by_NID(rid->value.byName,NID_commonName,sCN,sizeof(sCN));
+          return(poX509);
+    OCSP_resp_get0_id(br, NULL, &name);
+    if (!name) {
+      if(br) OCSP_BASICRESP_free(br);
+      return(poX509);
+    }
+    iLen = X509_NAME_get_text_by_NID(name,NID_commonName,sCN,sizeof(sCN));
 	if (iLen > 0)  //VS: 18.03.2006 - use only currently valid cert for new notary
       pCert = Digi_FindCertBySubject(hStore, sCN, TRUE, 0, TRUE);
     if(pCert != NULL)
@@ -437,22 +435,20 @@ X509 *Digi_FindCertByResponse(StoreHandle *hStore, OCSP_RESPONSE *poResponse)
 //Added by AA 09/10/2003
 BOOL Digi_CheckResponderCertByResponse(X509 *poX509Responder, OCSP_RESPONSE *poResponse)
 {
-BOOL fRes = FALSE;
-OCSP_RESPID    *rid = NULL;
-OCSP_BASICRESP *br = NULL;
-OCSP_RESPDATA  *rd = NULL;
-int iLen;
-char sCNResp[255];
-char sCNCert[255];
-if (poResponse != NULL)
-  {
-  if ((br = OCSP_response_get1_basic(poResponse)) == NULL)
-    return(fRes); 
-	rd = br->tbsResponseData;
-	rid =  rd->responderId;
-	if (rid->type != V_OCSP_RESPID_NAME)
-    return(fRes); 
-	iLen = X509_NAME_get_text_by_NID(rid->value.byName,NID_commonName,sCNResp,sizeof(sCNResp));
+    BOOL fRes = FALSE;
+    OCSP_BASICRESP *br = NULL;
+    const X509_NAME *name = NULL;
+    int iLen;
+    char sCNResp[255];
+    char sCNCert[255];
+    if (poResponse != NULL)
+    {
+        if ((br = OCSP_response_get1_basic(poResponse)) == NULL)
+            return(fRes);
+        OCSP_resp_get0_id(br, NULL, &name);
+        if (!name)
+            return(fRes);
+        iLen = X509_NAME_get_text_by_NID(name,NID_commonName,sCNResp,sizeof(sCNResp));
 	if (iLen > 0)
 	  {
       iLen = X509_NAME_get_text_by_NID(X509_get_subject_name(poX509Responder),NID_commonName, sCNCert,sizeof(sCNCert));

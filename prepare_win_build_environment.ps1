@@ -1,12 +1,11 @@
 #powershell -ExecutionPolicy ByPass -File prepare_win_build_environment.ps1 [-openssl] [-libxml2] [-zlib]
 param(
 	[string]$target = "C:\build",
-	[string]$msbuild = "C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe",
 	[string]$7zip = "C:\Program Files\7-Zip\7z.exe",
 	[string]$cmake = "C:\Program Files (x86)\CMake\bin\cmake.exe",
-	[string]$vcvars = "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat", #$env:VCINSTALLDIR
+	[string]$vcvars = "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat",
 	[string]$opensslver = "openssl-1.0.2e",
-	[string]$libxml2ver = "libxml2-2.9.3",
+	[string]$libxml2ver = "libxml2-2.9.9",
 	[string]$zlibver = "zlib-1.2.8",
 	[switch]$openssl = $false,
 	[switch]$libxml2 = $false,
@@ -43,20 +42,16 @@ function libxml2() {
 	$client.DownloadFile("http://xmlsoft.org/sources/$libxml2ver.tar.gz", "$target\$libxml2ver.tar.gz")
 	& $7zip x "$libxml2ver.tar.gz"
 	& $7zip x "$libxml2ver.tar"
-
 	Push-Location -Path "$libxml2ver\win32"
 	& cscript configure.js iconv=no iso8859x=yes "prefix=$target\libxml2\x86"
 	& $vcvars x86 "&&" nmake -f Makefile.msvc install
 	Pop-Location
 	Remove-Item $libxml2ver -Force -Recurse
-	& $7zip x "$libxml2ver.tar"
-	foreach($item in $shell.NameSpace("$libdigidoc\$libxml2ver-patches.zip").items()) {
-		$shell.Namespace($target).CopyHere($item,0x14)
-	}
 
+	& $7zip x "$libxml2ver.tar"
 	Push-Location -Path "$libxml2ver\win32"
 	& cscript configure.js iconv=no iso8859x=yes "prefix=$target\libxml2\x64"
-	& $vcvars x86_amd64 "&&" nmake -f Makefile.msvc install
+	& $vcvars x64 "&&" nmake -f Makefile.msvc install
 	Pop-Location
 	Remove-Item $libxml2ver -Force -Recurse
 	Remove-Item "$libxml2ver.tar" -Force -Recurse

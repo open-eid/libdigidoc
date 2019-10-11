@@ -1,3 +1,9 @@
+DigiDoc C library [3.10.5](https://github.com/open-eid/libdigidocpp/releases/tag/v3.10.5) release notes
+-----------------------------------
+- Fix OpenSSL 1.1 build on windows
+
+[Full Changelog](https://github.com/open-eid/libdigidocpp/compare/v3.10.4...v3.10.5)
+
 DigiDoc C library [3.10.4](https://github.com/open-eid/libdigidocpp/releases/tag/v3.10.4) release notes
 -----------------------------------
 - OpenSSL 1.1 support

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(libdigidoc VERSION 3.10.4)
+project(libdigidoc VERSION 3.10.5)
 
 set( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules" )
 set( BUILD_TOOLS YES CACHE BOOL "Build digidoc-tool" )
